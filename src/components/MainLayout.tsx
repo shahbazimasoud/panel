@@ -3,7 +3,6 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { SidebarProvider, Sidebar, SidebarInset } from '@/components/ui/sidebar';
-import PageHeader from '@/components/PageHeader';
 import UserDirectory from '@/components/UserDirectory';
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
@@ -24,7 +23,6 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           <UserDirectory />
         </Sidebar>
         <SidebarInset>
-          <PageHeader />
           {children}
         </SidebarInset>
       </div>

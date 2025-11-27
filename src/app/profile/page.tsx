@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { users } from '@/lib/data';
 import Link from 'next/link';
 import MainLayout from '@/components/MainLayout';
+import PageHeader from '@/components/PageHeader';
 
 // This is a mock. In a real app, you'd get this from a session/context.
 const useAuth = () => {
@@ -76,6 +77,7 @@ export default function ProfilePage() {
 
   return (
     <MainLayout>
+      <PageHeader />
       <div className="container mx-auto max-w-3xl p-4 sm:p-6 lg:p-8">
         <div className="mb-8">
             <h1 className="text-3xl font-bold font-headline">Your Profile</h1>

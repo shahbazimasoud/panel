@@ -5,11 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { getActivityLog } from '@/lib/activity-log';
 import type { ActivityLogEvent } from '@/lib/types';
-import { LogIn, LogOut, Coffee, Timer, FilterX } from 'lucide-react';
+import { LogIn, LogOut, Coffee, Timer, FilterX, ArrowLeft } from 'lucide-react';
 import { format, formatDuration, intervalToDuration, startOfDay, isSameDay } from 'date-fns';
 import { DatePicker } from '@/components/ui/datepicker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import MainLayout from '@/components/MainLayout';
+import PageHeader from '@/components/PageHeader';
+import Link from 'next/link';
 
 type DailyLog = {
   date: string;
@@ -132,11 +134,18 @@ export default function ActivityPage() {
 
   return (
     <MainLayout>
+      <PageHeader />
         <div className="container mx-auto max-w-4xl p-4 sm:p-6 lg:p-8">
             <div className="mb-8 flex items-center justify-between">
                 <div>
-                <h1 className="text-3xl font-bold font-headline">Activity Report</h1>
-                <p className="text-muted-foreground">A detailed log of your session activity.</p>
+                  <Button variant="ghost" className="mb-2" asChild>
+                    <Link href="/">
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Back to Home
+                    </Link>
+                  </Button>
+                  <h1 className="text-3xl font-bold font-headline">Activity Report</h1>
+                  <p className="text-muted-foreground">A detailed log of your session activity.</p>
                 </div>
             </div>
 
