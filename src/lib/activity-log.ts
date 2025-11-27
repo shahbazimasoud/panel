@@ -21,32 +21,26 @@ export const getActivityLog = (): ActivityLogEvent[] => {
   return JSON.parse(localStorage.getItem(ACTIVITY_LOG_KEY) || '[]');
 };
 
-export const calculateDailyTotal = (events: ActivityLogEvent[], date: Date): number => {
+export const calculateDailyTotal = (allEvents: ActivityLogEvent[], date: Date): number => {
     let totalMilliseconds = 0;
     let lastActiveTimestamp: number | null = null;
 
-    const dailyEvents = events.filter(e => isSameDay(new Date(e.timestamp), date));
-    
-    // Find first login or active event on that day to start counting
-    const firstEvent = dailyEvents.find(e => e.type === 'LOGIN' || e.type === 'ACTIVE');
-    if (!firstEvent) return 0;
-    
-    // Start tracking from the beginning of the day or the first event, whichever is later
-    let currentTime = startOfDay(date).getTime();
+    const startOfTargetDay = startOfDay(date);
+
+    const dailyEvents = allEvents.filter(e => isSameDay(new Date(e.timestamp), startOfTargetDay));
 
     for (const event of dailyEvents) {
-        if(event.timestamp < currentTime) continue;
-
         if (event.type === 'ACTIVE' || event.type === 'LOGIN') {
-            lastActiveTimestamp = event.timestamp;
-        } else if ((event.type === 'AWAY' || event.type === 'LOGOUT') && lastActiveTimestamp) {
+            if (lastActiveTimestamp === null) {
+                lastActiveTimestamp = event.timestamp;
+            }
+        } else if ((event.type === 'AWAY' || event.type === 'LOGOUT') && lastActiveTimestamp !== null) {
             totalMilliseconds += event.timestamp - lastActiveTimestamp;
-            lastActiveTimestamp = null; // User is now away or logged out
+            lastActiveTimestamp = null;
         }
     }
     
-    // If user is still active at the end of the log and the log is for today
-    if (lastActiveTimestamp && isSameDay(date, new Date())) {
+    if (lastActiveTimestamp !== null && isSameDay(date, new Date())) {
         totalMilliseconds += Date.now() - lastActiveTimestamp;
     }
 
