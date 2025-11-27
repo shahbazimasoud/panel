@@ -1,6 +1,7 @@
 'use client';
 
 import { ActivityLogEvent } from './types';
+import { isSameDay, startOfDay } from 'date-fns';
 
 const ACTIVITY_LOG_KEY = 'orgconnect-activity-log';
 
@@ -20,40 +21,42 @@ export const getActivityLog = (): ActivityLogEvent[] => {
   return JSON.parse(localStorage.getItem(ACTIVITY_LOG_KEY) || '[]');
 };
 
-export const getTodayTotalDuration = (): number => {
-    const log = getActivityLog();
-    const today = new Date().toISOString().split('T')[0];
-    let totalSeconds = 0;
-    let sessionStart: number | null = null;
+export const calculateDailyTotal = (events: ActivityLogEvent[], date: Date): number => {
+    let totalMilliseconds = 0;
     let lastActiveTimestamp: number | null = null;
 
-    for (const event of log) {
-        const eventDay = new Date(event.timestamp).toISOString().split('T')[0];
-        if (eventDay !== today) continue;
+    const dailyEvents = events.filter(e => isSameDay(new Date(e.timestamp), date));
+    
+    // Find first login or active event on that day to start counting
+    const firstEvent = dailyEvents.find(e => e.type === 'LOGIN' || e.type === 'ACTIVE');
+    if (!firstEvent) return 0;
+    
+    // Start tracking from the beginning of the day or the first event, whichever is later
+    let currentTime = startOfDay(date).getTime();
 
-        if (event.type === 'LOGIN') {
-            sessionStart = event.timestamp;
+    for (const event of dailyEvents) {
+        if(event.timestamp < currentTime) continue;
+
+        if (event.type === 'ACTIVE' || event.type === 'LOGIN') {
             lastActiveTimestamp = event.timestamp;
-        } else if (event.type === 'ACTIVE' && sessionStart !== null) {
-            lastActiveTimestamp = event.timestamp;
-        } else if (event.type === 'AWAY' && sessionStart !== null && lastActiveTimestamp !== null) {
-            totalSeconds += (event.timestamp - lastActiveTimestamp) / 1000;
-            lastActiveTimestamp = null; // Reset last active timestamp as user is now away
-        } else if (event.type === 'LOGOUT' && sessionStart !== null) {
-            if(lastActiveTimestamp !== null) {
-                totalSeconds += (event.timestamp - lastActiveTimestamp) / 1000;
-            }
-            sessionStart = null;
-            lastActiveTimestamp = null;
+        } else if ((event.type === 'AWAY' || event.type === 'LOGOUT') && lastActiveTimestamp) {
+            totalMilliseconds += event.timestamp - lastActiveTimestamp;
+            lastActiveTimestamp = null; // User is now away or logged out
         }
     }
-
-    // If there's an ongoing active session at the end of the log
-    if (sessionStart !== null && lastActiveTimestamp !== null) {
-        totalSeconds += (Date.now() - lastActiveTimestamp) / 1000;
-    }
     
-    return totalSeconds;
+    // If user is still active at the end of the log and the log is for today
+    if (lastActiveTimestamp && isSameDay(date, new Date())) {
+        totalMilliseconds += Date.now() - lastActiveTimestamp;
+    }
+
+    return totalMilliseconds / 1000;
+}
+
+
+export const getTodayTotalDuration = (): number => {
+    const log = getActivityLog();
+    return calculateDailyTotal(log, new Date());
 };
 
 export const clearActivityLog = () => {

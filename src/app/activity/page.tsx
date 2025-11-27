@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { getActivityLog } from '@/lib/activity-log';
+import { getActivityLog, calculateDailyTotal } from '@/lib/activity-log';
 import type { ActivityLogEvent } from '@/lib/types';
 import { ArrowLeft, LogIn, LogOut, Coffee, Timer, FilterX } from 'lucide-react';
 import { format, formatDuration, intervalToDuration, startOfDay, isSameDay } from 'date-fns';
@@ -39,40 +39,9 @@ function formatEventDuration(start: number, end: number) {
   }) || 'less than a second';
 }
 
-function calculateDailyTotal(events: ActivityLogEvent[]): string {
-    let totalMilliseconds = 0;
-    let lastActiveTimestamp: number | null = null;
-
-    // Filter for today's events to be accurate
-    const today = startOfDay(new Date());
-    const dailyEvents = events.filter(e => isSameDay(new Date(e.timestamp), today));
-    
-    // Find first login or active event to start counting
-    const firstEvent = dailyEvents.find(e => e.type === 'LOGIN' || e.type === 'ACTIVE');
-    if (!firstEvent) return '0 seconds';
-
-    lastActiveTimestamp = firstEvent.timestamp;
-
-    for (const event of dailyEvents) {
-        if(event.timestamp < lastActiveTimestamp) continue;
-
-        if (event.type === 'ACTIVE' || event.type === 'LOGIN') {
-            lastActiveTimestamp = event.timestamp;
-        } else if (event.type === 'AWAY' && lastActiveTimestamp) {
-            totalMilliseconds += event.timestamp - lastActiveTimestamp;
-            lastActiveTimestamp = null; // User is now away
-        } else if (event.type === 'LOGOUT' && lastActiveTimestamp) {
-            totalMilliseconds += event.timestamp - lastActiveTimestamp;
-            lastActiveTimestamp = null;
-        }
-    }
-    
-    // If still active at the end of log
-    if (lastActiveTimestamp) {
-        totalMilliseconds += Date.now() - lastActiveTimestamp;
-    }
-
-    const duration = intervalToDuration({ start: 0, end: totalMilliseconds });
+function formatTotalDuration(totalSeconds: number): string {
+    if (totalSeconds < 1) return '0 seconds';
+    const duration = intervalToDuration({ start: 0, end: totalSeconds * 1000 });
     return formatDuration(duration, {
         format: ['hours', 'minutes', 'seconds'],
         zero: false,
@@ -171,7 +140,9 @@ export default function ActivityPage() {
           </Card>
         ) : (
           Object.entries(filteredAndGroupedLog).map(([date, events]) => {
-            const dailyTotal = calculateDailyTotal(rawLog.filter(e => format(new Date(e.timestamp), 'eeee, MMMM do, yyyy') === date));
+             // We pass the full rawLog and the specific date to the calculation function.
+             // The date string is parsed back into a Date object.
+            const dailyTotalInSeconds = calculateDailyTotal(rawLog.slice().reverse(), new Date(events[0].timestamp));
 
             return (
                 <Card key={date}>
@@ -179,7 +150,7 @@ export default function ActivityPage() {
                     <div className="flex justify-between items-center">
                         <CardTitle>{date}</CardTitle>
                         <p className="text-sm font-medium text-muted-foreground">
-                            Total Active Time: <span className="font-bold text-primary">{dailyTotal}</span>
+                            Total Active Time: <span className="font-bold text-primary">{formatTotalDuration(dailyTotalInSeconds)}</span>
                         </p>
                     </div>
                 </CardHeader>
