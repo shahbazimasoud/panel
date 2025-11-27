@@ -10,12 +10,9 @@ import { Button } from '@/components/ui/button';
 import { Search, SlidersHorizontal, Users } from 'lucide-react';
 import { SidebarHeader, SidebarContent, SidebarFooter } from '@/components/ui/sidebar';
 
-const ALPHABET = "ابپتثجچحخدذرزژسشصضطظعغفقکگلمنوهی".split('');
-
 export default function UserDirectory() {
   const [searchTerm, setSearchTerm] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('all');
-  const [alphabetFilter, setAlphabetFilter] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(20);
 
   const filteredUsers = useMemo(() => {
@@ -25,19 +22,8 @@ export default function UserDirectory() {
       )
       .filter(
         (user) => departmentFilter === 'all' || user.department === departmentFilter
-      )
-      .filter(
-        (user) => alphabetFilter === null || user.name.startsWith(alphabetFilter)
       );
-  }, [searchTerm, departmentFilter, alphabetFilter]);
-  
-  const handleAlphabetFilter = (letter: string) => {
-    if (alphabetFilter === letter) {
-      setAlphabetFilter(null);
-    } else {
-      setAlphabetFilter(letter);
-    }
-  };
+  }, [searchTerm, departmentFilter]);
   
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
@@ -73,27 +59,6 @@ export default function UserDirectory() {
                 ))}
               </SelectContent>
             </Select>
-        </div>
-        <div className="mt-4 flex flex-wrap gap-1">
-            {ALPHABET.map(letter => (
-                <Button 
-                    key={letter} 
-                    variant={alphabetFilter === letter ? 'default' : 'outline'}
-                    size="sm"
-                    className="h-7 w-7 p-0"
-                    onClick={() => handleAlphabetFilter(letter)}
-                >
-                    {letter}
-                </Button>
-            ))}
-             <Button 
-                    variant={alphabetFilter === null ? 'secondary' : 'outline'}
-                    size="sm"
-                    className="h-7 grow"
-                    onClick={() => setAlphabetFilter(null)}
-                >
-                    همه
-                </Button>
         </div>
       </SidebarHeader>
 
