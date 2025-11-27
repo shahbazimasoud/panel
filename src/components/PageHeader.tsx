@@ -7,9 +7,7 @@ import {
 } from '@/components/ui/sidebar';
 import {
   User,
-  LogIn,
   LogOut,
-  PanelLeftClose,
   PanelLeftOpen,
   Clock,
   Settings,
@@ -27,18 +25,9 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { users } from '@/lib/data';
 import { cn } from '@/lib/utils';
-import type { UserStatus } from '@/lib/types';
+import type { UserStatus, ActivityLogEvent } from '@/lib/types';
 import { useRouter } from 'next/navigation';
-
-const SESSION_STORAGE_KEY = 'orgconnect-session';
-
-interface SessionData {
-  date: string;
-  totalSeconds: number;
-  sessionStartTime: number | null;
-}
-
-const getToday = () => new Date().toISOString().split('T')[0];
+import { logActivity, getTodayTotalDuration } from '@/lib/activity-log';
 
 // This is a mock. In a real app, you'd get this from a session/context.
 const useAuth = () => {
@@ -50,24 +39,8 @@ const useAuth = () => {
   }, []);
 
   const logout = () => {
+    logActivity('LOGOUT');
     localStorage.removeItem('isAuthenticated');
-    
-    // On logout, update the total time for the day
-    const sessionDataString = localStorage.getItem(SESSION_STORAGE_KEY);
-    if (sessionDataString) {
-      try {
-        const data: SessionData = JSON.parse(sessionDataString);
-        if (data.sessionStartTime) {
-          const sessionDuration = Math.floor((Date.now() - data.sessionStartTime) / 1000);
-          data.totalSeconds += sessionDuration;
-          data.sessionStartTime = null; // Mark session as ended
-          localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(data));
-        }
-      } catch (error) {
-        console.error("Failed to parse session data on logout:", error);
-      }
-    }
-    
     setIsAuthenticated(false);
   }
 
@@ -103,75 +76,34 @@ export default function PageHeader() {
   const [sessionDuration, setSessionDuration] = useState(0);
   const router = useRouter();
   
-  const saveCurrentSession = useCallback(() => {
-     if (isAuthenticated) {
-        const sessionDataString = localStorage.getItem(SESSION_STORAGE_KEY);
-        if (sessionDataString) {
-          try {
-            const data: SessionData = JSON.parse(sessionDataString);
-            if (data.sessionStartTime) {
-              const currentSessionDuration = Math.floor((Date.now() - data.sessionStartTime) / 1000);
-              const updatedData: SessionData = {
-                ...data,
-                totalSeconds: data.totalSeconds + currentSessionDuration,
-                sessionStartTime: Date.now(), // Reset start time for the next calculation
-              };
-              localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(updatedData));
-            }
-          } catch (error) {
-            console.error("Failed to update session data:", error);
-          }
-        }
-      }
-  }, [isAuthenticated]);
-
-
+  const handleVisibilityChange = useCallback(() => {
+    if (document.visibilityState === 'hidden') {
+      logActivity('AWAY');
+    } else {
+      logActivity('ACTIVE');
+    }
+    setSessionDuration(getTodayTotalDuration());
+  }, []);
+  
   useEffect(() => {
     let timer: NodeJS.Timeout | undefined;
     if (isAuthenticated) {
-      const today = getToday();
-      let data: SessionData;
-      const sessionDataString = localStorage.getItem(SESSION_STORAGE_KEY);
-
-      if (sessionDataString) {
-          data = JSON.parse(sessionDataString);
-          // If the stored date is not today, reset the timer for the new day.
-          if(data.date !== today) {
-              data = { date: today, totalSeconds: 0, sessionStartTime: Date.now() };
-          } else if (!data.sessionStartTime) {
-            // If it is today but no active session, start one.
-             data.sessionStartTime = Date.now();
-          }
-      } else {
-          // No session data found, start a new one for today.
-          data = { date: today, totalSeconds: 0, sessionStartTime: Date.now() };
-      }
-      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(data));
-      
+      setSessionDuration(getTodayTotalDuration());
 
       timer = setInterval(() => {
-        const sessionDataString = localStorage.getItem(SESSION_STORAGE_KEY);
-        if(sessionDataString) {
-            const currentData: SessionData = JSON.parse(sessionDataString);
-            const activeSessionDuration = currentData.sessionStartTime 
-                ? Math.floor((Date.now() - currentData.sessionStartTime) / 1000)
-                : 0;
-            setSessionDuration(currentData.totalSeconds + activeSessionDuration);
-        }
+        setSessionDuration(getTodayTotalDuration());
       }, 1000);
 
-      // Save session on page unload
-      window.addEventListener('beforeunload', saveCurrentSession);
+      window.addEventListener('visibilitychange', handleVisibilityChange);
     }
     
     return () => {
         if(timer) clearInterval(timer);
-        window.removeEventListener('beforeunload', saveCurrentSession);
+        window.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [isAuthenticated, saveCurrentSession]);
+  }, [isAuthenticated, handleVisibilityChange]);
 
   const handleLogout = () => {
-    saveCurrentSession(); // Save the final duration before logging out
     logout();
     router.push('/login');
   }
@@ -180,7 +112,7 @@ export default function PageHeader() {
     <div className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-background/80 px-4 backdrop-blur-sm sm:px-6">
       <div className="flex items-center gap-2">
         <SidebarTrigger className="flex items-center gap-2">
-          {open ? <PanelLeftClose /> : <PanelLeftOpen />}
+          <PanelLeftOpen />
           <span className="sr-only">Toggle user directory</span>
         </SidebarTrigger>
       </div>
@@ -195,10 +127,10 @@ export default function PageHeader() {
                 </Link>
               </Button>
             )}
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Link href="/activity" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
               <Clock className="h-4 w-4" />
               <span>{formatDuration(sessionDuration)}</span>
-            </div>
+            </Link>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
@@ -238,12 +170,7 @@ export default function PageHeader() {
             </DropdownMenu>
           </>
         ) : (
-          <Button asChild>
-            <Link href="/login">
-              <LogIn className="mr-2" />
-              Login
-            </Link>
-          </Button>
+           <Button variant="ghost" onClick={() => router.push('/login')}>Login</Button>
         )}
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { SidebarProvider, Sidebar, SidebarInset } from '@/components/ui/sidebar';
+import { SidebarProvider, Sidebar, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import Header from '@/components/Header';
 import SystemGrid from '@/components/SystemGrid';
 import UserDirectory from '@/components/UserDirectory';
@@ -13,7 +13,7 @@ export default function Home() {
         <Sidebar side="left" collapsible="icon" className="border-r">
           <UserDirectory />
         </Sidebar>
-        <SidebarInset className="bg-background">
+        <SidebarInset>
           <PageHeader />
           <main className="container mx-auto p-4 sm:p-6 lg:p-8">
             <Header />

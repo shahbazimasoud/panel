@@ -26,3 +26,8 @@ export interface Guide {
   icon: string; // lucide-react icon name
   url: string;
 }
+
+export type ActivityLogEvent = {
+  type: 'LOGIN' | 'LOGOUT' | 'AWAY' | 'ACTIVE';
+  timestamp: number;
+};
