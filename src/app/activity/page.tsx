@@ -92,21 +92,24 @@ export default function ActivityPage() {
 
       let totalMilliseconds = 0;
       let lastActiveTimestamp: number | null = null;
-      const day = new Date(dayEvents[0].timestamp);
+      
+      if(dayEvents.length > 0) {
+        const day = new Date(dayEvents[0].timestamp);
 
-      for (const event of dayEvents) {
-        if (event.type === 'ACTIVE' || event.type === 'LOGIN') {
-            if (lastActiveTimestamp === null) {
-                lastActiveTimestamp = event.timestamp;
-            }
-        } else if ((event.type === 'AWAY' || event.type === 'LOGOUT') && lastActiveTimestamp !== null) {
-            totalMilliseconds += event.timestamp - lastActiveTimestamp;
-            lastActiveTimestamp = null;
+        for (const event of dayEvents) {
+          if (event.type === 'ACTIVE' || event.type === 'LOGIN') {
+              if (lastActiveTimestamp === null) {
+                  lastActiveTimestamp = event.timestamp;
+              }
+          } else if ((event.type === 'AWAY' || event.type === 'LOGOUT') && lastActiveTimestamp !== null) {
+              totalMilliseconds += event.timestamp - lastActiveTimestamp;
+              lastActiveTimestamp = null;
+          }
         }
-      }
 
-      if (lastActiveTimestamp !== null && isSameDay(day, new Date())) {
-        totalMilliseconds += Date.now() - lastActiveTimestamp;
+        if (lastActiveTimestamp !== null && isSameDay(day, new Date())) {
+          totalMilliseconds += Date.now() - lastActiveTimestamp;
+        }
       }
       dayData.totalActiveSeconds = totalMilliseconds / 1000;
     });
@@ -145,7 +148,7 @@ export default function ActivityPage() {
 
   return (
     <MainLayout>
-        <div className="container mx-auto max-w-4xl p-4 sm:p-6 lg:p-8">
+        <div className="container mx-auto p-4 sm:p-6 lg:p-8">
             <div className="mb-8 flex items-center justify-between">
                 <div>
                   <Button variant="ghost" className="mb-2" asChild>
