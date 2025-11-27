@@ -40,6 +40,7 @@ export const calculateDailyTotal = (allEvents: ActivityLogEvent[], date: Date): 
         }
     }
     
+    // If the user is currently active on the target day (which would be today)
     if (lastActiveTimestamp !== null && isSameDay(date, new Date())) {
         totalMilliseconds += Date.now() - lastActiveTimestamp;
     }

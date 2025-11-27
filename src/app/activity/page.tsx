@@ -3,9 +3,9 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { getActivityLog, calculateDailyTotal } from '@/lib/activity-log';
+import { getActivityLog } from '@/lib/activity-log';
 import type { ActivityLogEvent } from '@/lib/types';
-import { ArrowLeft, LogIn, LogOut, Coffee, Timer, FilterX } from 'lucide-react';
+import { LogIn, LogOut, Coffee, Timer, FilterX } from 'lucide-react';
 import { format, formatDuration, intervalToDuration, startOfDay, isSameDay } from 'date-fns';
 import { DatePicker } from '@/components/ui/datepicker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -55,7 +55,7 @@ export default function ActivityPage() {
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
 
   useEffect(() => {
-    setRawLog(getActivityLog().reverse()); // Show most recent first
+    setRawLog(getActivityLog()); 
   }, []);
 
   const filteredAndGroupedLog = useMemo(() => {
@@ -70,7 +70,10 @@ export default function ActivityPage() {
       log = log.filter(event => event.type === typeFilter);
     }
     
-    const grouped = log.reduce((acc, event) => {
+    // Reverse here so that events within a day are newest first
+    const reversedLog = [...log].reverse();
+
+    const grouped = reversedLog.reduce((acc, event) => {
       const date = format(new Date(event.timestamp), 'eeee, MMMM do, yyyy');
       if (!acc[date]) {
         acc[date] = [];
@@ -81,6 +84,34 @@ export default function ActivityPage() {
 
     return grouped;
   }, [rawLog, dateFilter, typeFilter]);
+  
+  const dailyTotals = useMemo(() => {
+    const totals: Record<string, number> = {};
+    Object.keys(filteredAndGroupedLog).forEach(dateStr => {
+      const events = filteredAndGroupedLog[dateStr].slice().reverse(); // original order
+      let totalMilliseconds = 0;
+      let lastActiveTimestamp: number | null = null;
+      const day = new Date(events[0].timestamp);
+
+      for (const event of events) {
+        if (event.type === 'ACTIVE' || event.type === 'LOGIN') {
+            if (lastActiveTimestamp === null) {
+                lastActiveTimestamp = event.timestamp;
+            }
+        } else if ((event.type === 'AWAY' || event.type === 'LOGOUT') && lastActiveTimestamp !== null) {
+            totalMilliseconds += event.timestamp - lastActiveTimestamp;
+            lastActiveTimestamp = null;
+        }
+      }
+
+      if (lastActiveTimestamp !== null && isSameDay(day, new Date())) {
+        totalMilliseconds += Date.now() - lastActiveTimestamp;
+      }
+      totals[dateStr] = totalMilliseconds / 1000;
+    });
+    return totals;
+  }, [filteredAndGroupedLog])
+
 
   const clearFilters = () => {
       setDateFilter(undefined);
@@ -135,7 +166,7 @@ export default function ActivityPage() {
                 </Card>
                 ) : (
                 Object.entries(filteredAndGroupedLog).map(([date, events]) => {
-                    const dailyTotalInSeconds = calculateDailyTotal(rawLog.slice().reverse(), new Date(events[0].timestamp));
+                    const dailyTotalInSeconds = dailyTotals[date] || 0;
 
                     return (
                         <Card key={date}>
