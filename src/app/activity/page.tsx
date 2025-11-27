@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { getActivityLog } from '@/lib/activity-log';
 import type { ActivityLogEvent } from '@/lib/types';
-import { LogIn, LogOut, Coffee, Timer, FilterX, ArrowLeft } from 'lucide-react';
+import { LogIn, LogOut, Coffee, Timer, FilterX, ArrowLeft, Monitor, Smartphone, Tablet } from 'lucide-react';
 import { format, formatDuration, intervalToDuration, startOfDay, isSameDay } from 'date-fns';
 import { DatePicker } from '@/components/ui/datepicker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -51,6 +51,13 @@ function formatTotalDuration(totalSeconds: number): string {
         format: ['hours', 'minutes', 'seconds'],
         zero: false,
     }) || '0 seconds';
+}
+
+function DeviceIcon({ device, os }: { device?: string; os?: string }) {
+    if (device === 'Phone' || device === 'Tablet') {
+        return <Smartphone className="mr-2 h-4 w-4" />;
+    }
+    return <Monitor className="mr-2 h-4 w-4" />;
 }
 
 
@@ -232,7 +239,15 @@ export default function ActivityPage() {
                                             {eventIcons[event.type]}
                                         </div>
                                         <div className="flex-1 pt-1.5">
-                                            <p className="font-medium">{eventText[event.type]}</p>
+                                            <div className="flex items-center justify-between">
+                                                <p className="font-medium">{eventText[event.type]}</p>
+                                                {event.deviceInfo && (
+                                                    <div className="flex items-center text-xs text-muted-foreground">
+                                                        <DeviceIcon device={event.deviceInfo.device} os={event.deviceInfo.os} />
+                                                        {event.deviceInfo.device}, {event.deviceInfo.os}, {event.deviceInfo.browser}
+                                                    </div>
+                                                )}
+                                            </div>
                                             <p className="text-sm text-muted-foreground">
                                                 {format(new Date(event.timestamp), 'HH:mm:ss')}
                                             </p>

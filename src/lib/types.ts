@@ -30,4 +30,9 @@ export interface Guide {
 export type ActivityLogEvent = {
   type: 'LOGIN' | 'LOGOUT' | 'AWAY' | 'ACTIVE';
   timestamp: number;
+  deviceInfo?: {
+    device: string;
+    os: string;
+    browser: string;
+  };
 };
