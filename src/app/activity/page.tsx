@@ -66,31 +66,30 @@ export default function ActivityPage() {
   const processedLog = useMemo(() => {
     let log = rawLog;
 
-    if (dateFilter) {
-      const startOfFilterDate = startOfDay(dateFilter);
-      log = log.filter(event => isSameDay(new Date(event.timestamp), startOfFilterDate));
-    }
-
-    if (typeFilter !== 'ALL') {
-      log = log.filter(event => event.type === typeFilter);
-    }
+    const filteredLog = log.filter(event => {
+      const isDateMatch = !dateFilter || isSameDay(new Date(event.timestamp), startOfDay(dateFilter));
+      const isTypeMatch = typeFilter === 'ALL' || event.type === typeFilter;
+      return isDateMatch && isTypeMatch;
+    });
     
     // Process everything in one go
     const groupedByDay: Record<string, { events: ActivityLogEvent[], totalActiveSeconds: number }> = {};
 
     // Group events by day first
-    for (const event of log) {
+    for (const event of rawLog) { // use rawLog to calculate totals correctly, independent of type filter
       const dateKey = format(new Date(event.timestamp), 'eeee, MMMM do, yyyy');
       if (!groupedByDay[dateKey]) {
         groupedByDay[dateKey] = { events: [], totalActiveSeconds: 0 };
       }
-      groupedByDay[dateKey].events.push(event);
     }
     
     // Calculate totals and sort events for each day
     Object.keys(groupedByDay).forEach(dateKey => {
       const dayData = groupedByDay[dateKey];
-      const dayEvents = dayData.events.slice().sort((a,b) => a.timestamp - b.timestamp); // sort ascending
+      const dayEvents = rawLog.filter(e => format(new Date(e.timestamp), 'eeee, MMMM do, yyyy') === dateKey)
+                              .slice()
+                              .sort((a,b) => a.timestamp - b.timestamp); // sort ascending
+
       let totalMilliseconds = 0;
       let lastActiveTimestamp: number | null = null;
       const day = new Date(dayEvents[0].timestamp);
@@ -110,17 +109,30 @@ export default function ActivityPage() {
         totalMilliseconds += Date.now() - lastActiveTimestamp;
       }
       dayData.totalActiveSeconds = totalMilliseconds / 1000;
-      
-      // Reverse events for display (newest first)
-      dayData.events.reverse();
     });
+
+    const displayGroupedByDay: Record<string, { events: ActivityLogEvent[] }> = {};
+     for (const event of filteredLog) {
+      const dateKey = format(new Date(event.timestamp), 'eeee, MMMM do, yyyy');
+      if (!displayGroupedByDay[dateKey]) {
+        displayGroupedByDay[dateKey] = { events: [] };
+      }
+      displayGroupedByDay[dateKey].events.push(event);
+    }
+     Object.keys(displayGroupedByDay).forEach(dateKey => {
+        displayGroupedByDay[dateKey].events.sort((a,b) => b.timestamp - a.timestamp); // newest first
+    });
+
     
     // Sort days chronologically descending
-    const sortedDays = Object.keys(groupedByDay).sort((a,b) => new Date(b).getTime() - new Date(a).getTime());
+    const sortedDays = Object.keys(displayGroupedByDay).sort((a,b) => {
+        return new Date(b).getTime() - new Date(a).getTime()
+    });
 
     return sortedDays.map(dateKey => ({
       date: dateKey,
-      ...groupedByDay[dateKey]
+      events: displayGroupedByDay[dateKey].events,
+      totalActiveSeconds: groupedByDay[dateKey]?.totalActiveSeconds || 0
     }));
 
   }, [rawLog, dateFilter, typeFilter]);
