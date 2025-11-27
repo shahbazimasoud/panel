@@ -72,9 +72,9 @@ export default function UserDirectory() {
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="p-0">
+      <SidebarContent className="p-0 group-data-[collapsible=icon]:hidden">
         <ScrollArea className="h-full">
-          <div className="space-y-1 p-4 pt-0 group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:pt-0">
+          <div className="space-y-1 p-4 pt-0">
             {filteredUsers.slice(0, visibleCount).map((user) => (
               <UserListItem key={user.id} user={user} />
             ))}
