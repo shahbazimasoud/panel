@@ -33,22 +33,12 @@ import { useRouter } from 'next/navigation';
 
 // This is a mock. In a real app, you'd get this from a session/context.
 const useAuth = () => {
-  // To test the logged-out state, change this to `false`
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    // This check runs only on the client
     const loggedIn = localStorage.getItem('isAuthenticated') === 'true';
     setIsAuthenticated(loggedIn);
   }, []);
-  
-  const user = isAuthenticated ? users.find((u) => u.id === '1') : null; // Mock: Arash Shams
-
-  const login = () => {
-    localStorage.setItem('isAuthenticated', 'true');
-    localStorage.setItem('sessionStartTime', Date.now().toString());
-    setIsAuthenticated(true);
-  }
 
   const logout = () => {
     localStorage.removeItem('isAuthenticated');
@@ -56,11 +46,12 @@ const useAuth = () => {
     setIsAuthenticated(false);
   }
 
+  const user = isAuthenticated ? users.find((u) => u.id === '1') : null; // Mock: Arash Shams
+
   return {
     isAuthenticated,
     user,
     isAdmin: isAuthenticated && user?.email === 'admin@example.com', // Example admin logic
-    login,
     logout
   };
 };
