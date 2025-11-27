@@ -205,28 +205,6 @@ export default function ActivityPage() {
 
             <Card className="mb-8">
                 <CardHeader>
-                    <CardTitle>{summaryTitle}</CardTitle>
-                    <CardDescription>Total active and away time based on the selected filter.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                     <Table>
-                        <TableBody>
-                            <TableRow>
-                                <TableCell className="font-medium">Total Active Time</TableCell>
-                                <TableCell className="text-right font-bold text-green-600">{formatTotalDuration(overallSummary.totalActiveSeconds)}</TableCell>
-                            </TableRow>
-                             <TableRow>
-                                <TableCell className="font-medium">Total Away Time</TableCell>
-                                <TableCell className="text-right font-bold text-yellow-600">{formatTotalDuration(overallSummary.totalAwaySeconds)}</TableCell>
-                            </TableRow>
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
-
-
-            <Card className="mb-8">
-                <CardHeader>
                 <CardTitle>Filters</CardTitle>
                 <CardDescription>Narrow down the activity log by date or event type.</CardDescription>
                 </CardHeader>
@@ -250,6 +228,27 @@ export default function ActivityPage() {
                             Clear Filters
                         </Button>
                     )}
+                </CardContent>
+            </Card>
+            
+            <Card className="mb-8">
+                <CardHeader>
+                    <CardTitle>{summaryTitle}</CardTitle>
+                    <CardDescription>Total active and away time based on the selected filter.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                     <Table>
+                        <TableBody>
+                            <TableRow>
+                                <TableCell className="font-medium">Total Active Time</TableCell>
+                                <TableCell className="text-right font-bold text-green-600">{formatTotalDuration(overallSummary.totalActiveSeconds)}</TableCell>
+                            </TableRow>
+                             <TableRow>
+                                <TableCell className="font-medium">Total Away Time</TableCell>
+                                <TableCell className="text-right font-bold text-yellow-600">{formatTotalDuration(overallSummary.totalAwaySeconds)}</TableCell>
+                            </TableRow>
+                        </TableBody>
+                    </Table>
                 </CardContent>
             </Card>
 
