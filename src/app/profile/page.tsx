@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,21 +14,39 @@ import Link from 'next/link';
 
 // This is a mock. In a real app, you'd get this from a session/context.
 const useAuth = () => {
-  const user = users.find((u) => u.id === '1'); // Mock: Arash Shams
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    setIsAuthenticated(localStorage.getItem('isAuthenticated') === 'true');
+  }, []);
+
+  const user = isAuthenticated ? users.find((u) => u.id === '1') : null; // Mock: Arash Shams
   return { user };
 };
 
 export default function ProfilePage() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [bio, setBio] = useState(user?.bio || '');
-  const [charCount, setCharCount] = useState(bio.length);
+  const router = useRouter();
+  
+  const [bio, setBio] = useState('');
+  const [charCount, setCharCount] = useState(0);
+
+  useEffect(() => {
+    if (user) {
+      const savedBio = user.bio || '';
+      setBio(savedBio);
+      setCharCount(savedBio.length);
+    } else if (typeof window !== 'undefined' && localStorage.getItem('isAuthenticated') !== 'true') {
+        router.push('/login');
+    }
+  }, [user, router]);
+
 
   if (!user) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p>User not found. Please log in.</p>
-        <Link href="/login" className="ml-2 text-primary hover:underline">Login</Link>
+       <div className="flex min-h-screen items-center justify-center">
+        <p>Loading user profile...</p>
       </div>
     );
   }
@@ -43,6 +62,11 @@ export default function ProfilePage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // In a real app, you would save this to your backend.
+    // For now, we can update the mock data if we want, but it won't persist.
+    const userIndex = users.findIndex(u => u.id === user.id);
+    if(userIndex !== -1) {
+        users[userIndex].bio = bio;
+    }
     console.log('Updated bio:', bio);
     toast({
       title: 'Profile Updated',

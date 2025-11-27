@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,11 +15,18 @@ export default function LoginPage() {
   const [password, setPassword] = useState('password');
   const [error, setError] = useState('');
 
+  // Redirect if already logged in
+  useEffect(() => {
+    if (localStorage.getItem('isAuthenticated') === 'true') {
+      router.push('/');
+    }
+  }, [router]);
+
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    // Mock authentication
     if (email === 'admin@example.com' && password === 'password') {
-      // In a real app, you'd set a session cookie here
+      localStorage.setItem('isAuthenticated', 'true');
+      localStorage.setItem('sessionStartTime', Date.now().toString());
       router.push('/');
     } else {
       setError('Incorrect username or password.');

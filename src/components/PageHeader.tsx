@@ -28,28 +28,52 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { users } from '@/lib/data';
 import { cn } from '@/lib/utils';
 import type { UserStatus } from '@/lib/types';
+import { useRouter } from 'next/navigation';
+
 
 // This is a mock. In a real app, you'd get this from a session/context.
 const useAuth = () => {
   // To test the logged-out state, change this to `false`
-  const isAuthenticated = true;
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  useEffect(() => {
+    // This check runs only on the client
+    const loggedIn = localStorage.getItem('isAuthenticated') === 'true';
+    setIsAuthenticated(loggedIn);
+  }, []);
+  
   const user = isAuthenticated ? users.find((u) => u.id === '1') : null; // Mock: Arash Shams
+
+  const login = () => {
+    localStorage.setItem('isAuthenticated', 'true');
+    localStorage.setItem('sessionStartTime', Date.now().toString());
+    setIsAuthenticated(true);
+  }
+
+  const logout = () => {
+    localStorage.removeItem('isAuthenticated');
+    localStorage.removeItem('sessionStartTime');
+    setIsAuthenticated(false);
+  }
 
   return {
     isAuthenticated,
     user,
     isAdmin: isAuthenticated && user?.email === 'admin@example.com', // Example admin logic
+    login,
+    logout
   };
 };
 
 function formatDuration(seconds: number) {
+  if (seconds < 0) seconds = 0;
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = Math.floor(seconds % 60);
   return [h, m, s]
     .map((v) => (v < 10 ? '0' + v : v))
     .filter((v, i) => v !== '00' || i > 0)
-    .join(':');
+    .join(':') || '0:00';
 }
 
 const statusClasses: Record<UserStatus, string> = {
@@ -59,18 +83,32 @@ const statusClasses: Record<UserStatus, string> = {
 };
 
 export default function PageHeader() {
-  const { isAuthenticated, isAdmin, user } = useAuth();
+  const { isAuthenticated, isAdmin, user, logout } = useAuth();
   const { open, toggleSidebar } = useSidebar();
   const [sessionDuration, setSessionDuration] = useState(0);
+  const router = useRouter();
 
   useEffect(() => {
+    let timer: NodeJS.Timeout | undefined;
     if (isAuthenticated) {
-      const timer = setInterval(() => {
-        setSessionDuration((prev) => prev + 1);
-      }, 1000);
-      return () => clearInterval(timer);
+      const sessionStartTime = localStorage.getItem('sessionStartTime');
+      if (sessionStartTime) {
+         timer = setInterval(() => {
+            const now = Date.now();
+            const start = parseInt(sessionStartTime, 10);
+            setSessionDuration(Math.floor((now - start) / 1000));
+        }, 1000);
+      }
     }
+    return () => {
+        if(timer) clearInterval(timer);
+    };
   }, [isAuthenticated]);
+
+  const handleLogout = () => {
+    logout();
+    router.push('/login');
+  }
 
   return (
     <div className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-background/80 px-4 backdrop-blur-sm sm:px-6">
@@ -126,11 +164,9 @@ export default function PageHeader() {
                     <span>Profile</span>
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                   <Link href="/login">
+                <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="mr-2 h-4 w-4" />
                     <span>Log out</span>
-                  </Link>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
