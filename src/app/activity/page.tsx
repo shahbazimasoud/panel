@@ -63,6 +63,42 @@ function DeviceIcon({ device, os }: { device?: string; os?: string }) {
     return <Monitor className="mr-2 h-4 w-4" />;
 }
 
+// Helper function to calculate summary totals for a given set of events
+function calculateSummary(events: ActivityLogEvent[]): { totalActiveSeconds: number; totalAwaySeconds: number } {
+    let totalActiveSeconds = 0;
+    let totalAwaySeconds = 0;
+    let lastActiveTimestamp: number | null = null;
+    let lastAwayTimestamp: number | null = null;
+
+    const sortedEvents = [...events].sort((a, b) => a.timestamp - b.timestamp);
+
+    for (const event of sortedEvents) {
+        if (event.type === 'ACTIVE' || event.type === 'LOGIN') {
+            if (lastActiveTimestamp === null) {
+                lastActiveTimestamp = event.timestamp;
+            }
+            if (lastAwayTimestamp !== null) {
+                totalAwaySeconds += (event.timestamp - lastAwayTimestamp) / 1000;
+                lastAwayTimestamp = null;
+            }
+        } else if (event.type === 'AWAY' || event.type === 'LOGOUT') {
+            if (lastAwayTimestamp === null) {
+                lastAwayTimestamp = event.timestamp;
+            }
+            if (lastActiveTimestamp !== null) {
+                totalActiveSeconds += (event.timestamp - lastActiveTimestamp) / 1000;
+                lastActiveTimestamp = null;
+            }
+        }
+    }
+    // If the user is currently active and we are looking at today's data, add the ongoing duration
+    if (lastActiveTimestamp !== null && (events.length > 0 && isSameDay(new Date(events[0].timestamp), new Date()))) {
+        totalActiveSeconds += (Date.now() - lastActiveTimestamp) / 1000;
+    }
+
+    return { totalActiveSeconds, totalAwaySeconds };
+}
+
 
 export default function ActivityPage() {
   const firestore = useFirestore();
@@ -89,47 +125,20 @@ export default function ActivityPage() {
         timestamp: dto.timestamp.toMillis(),
     }));
 
-    // --- Overall Summary Calculation ---
-    let totalActiveSeconds = 0;
-    let totalAwaySeconds = 0;
-    let lastActiveTimestamp: number | null = null;
-    let lastAwayTimestamp: number | null = null;
+    // --- Filter logs for both summary and detailed list ---
+    const filteredForSummary = rawLog.filter(event => {
+        return !dateFilter || isSameDay(new Date(event.timestamp), startOfDay(dateFilter));
+    });
+    
+    const overallSummary = calculateSummary(filteredForSummary);
+    
+    const filteredForList = filteredForSummary.filter(event => {
+        return typeFilter === 'ALL' || event.type === typeFilter;
+    });
 
-    const allSortedEvents = [...rawLog].sort((a, b) => a.timestamp - b.timestamp);
-
-    for (const event of allSortedEvents) {
-        if (event.type === 'ACTIVE' || event.type === 'LOGIN') {
-            if (lastActiveTimestamp === null) {
-                lastActiveTimestamp = event.timestamp;
-            }
-            if (lastAwayTimestamp !== null) {
-                totalAwaySeconds += (event.timestamp - lastAwayTimestamp) / 1000;
-                lastAwayTimestamp = null;
-            }
-        } else if (event.type === 'AWAY' || event.type === 'LOGOUT') {
-            if (lastAwayTimestamp === null) {
-                lastAwayTimestamp = event.timestamp;
-            }
-            if (lastActiveTimestamp !== null) {
-                totalActiveSeconds += (event.timestamp - lastActiveTimestamp) / 1000;
-                lastActiveTimestamp = null;
-            }
-        }
-    }
-    // If the user is currently active, add the duration to the total
-    if(lastActiveTimestamp !== null) {
-      totalActiveSeconds += (Date.now() - lastActiveTimestamp) / 1000;
-    }
-
-    const overallSummary = {
-        totalActiveSeconds: totalActiveSeconds,
-        totalAwaySeconds: totalAwaySeconds,
-    };
-    // --- End of Overall Summary Calculation ---
-
-
+    // --- Grouping for detailed daily logs ---
     const groupedByDay: Record<string, { events: ActivityLogEvent[], totalActiveSeconds: number }> = {};
-    for (const event of rawLog) {
+     for (const event of rawLog) { // Use all logs to calculate correct daily totals
       const dateKey = format(new Date(event.timestamp), 'eeee, MMMM do, yyyy');
       if (!groupedByDay[dateKey]) {
         groupedByDay[dateKey] = { events: [], totalActiveSeconds: 0 };
@@ -142,14 +151,9 @@ export default function ActivityPage() {
         groupedByDay[dateKey].totalActiveSeconds = calculateDailyTotal(dailyEvents, new Date(dateKey));
     });
 
-    const filteredLog = rawLog.filter(event => {
-      const isDateMatch = !dateFilter || isSameDay(new Date(event.timestamp), startOfDay(dateFilter));
-      const isTypeMatch = typeFilter === 'ALL' || event.type === typeFilter;
-      return isDateMatch && isTypeMatch;
-    });
-    
+    // --- Final processing for display list ---
     const displayGroupedByDay: Record<string, { events: ActivityLogEvent[] }> = {};
-     for (const event of filteredLog) {
+     for (const event of filteredForList) {
       const dateKey = format(new Date(event.timestamp), 'eeee, MMMM do, yyyy');
       if (!displayGroupedByDay[dateKey]) {
         displayGroupedByDay[dateKey] = { events: [] };
@@ -181,6 +185,8 @@ export default function ActivityPage() {
       setTypeFilter('ALL');
   }
 
+  const summaryTitle = dateFilter ? `Summary for ${format(dateFilter, 'MMMM do, yyyy')}` : 'Overall Summary (All Time)';
+
   return (
     <MainLayout>
         <div className="container mx-auto p-4 sm:p-6 lg:p-8 max-w-4xl">
@@ -199,7 +205,7 @@ export default function ActivityPage() {
 
             <Card className="mb-8">
                 <CardHeader>
-                    <CardTitle>Overall Summary</CardTitle>
+                    <CardTitle>{summaryTitle}</CardTitle>
                     <CardDescription>Total active and idle time based on the selected filters.</CardDescription>
                 </CardHeader>
                 <CardContent>
