@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 
 type UserListItemProps = {
   user: User;
+  sidebarCollapsed?: boolean;
 };
 
 const statusClasses = {
@@ -22,7 +23,7 @@ const statusText = {
   offline: 'آفلاین',
 };
 
-export default function UserListItem({ user }: UserListItemProps) {
+export default function UserListItem({ user, sidebarCollapsed = false }: UserListItemProps) {
   const { toast } = useToast();
 
   const handleUserClick = () => {
@@ -40,36 +41,44 @@ export default function UserListItem({ user }: UserListItemProps) {
     .map((n) => n[0])
     .join('');
 
+  const content = (
+    <div
+      onClick={handleUserClick}
+      className={cn(
+        "w-full text-right p-2 rounded-md hover:bg-sidebar-accent transition-colors flex items-center gap-3 cursor-pointer",
+        sidebarCollapsed && "justify-center"
+      )}
+    >
+      <div className="relative">
+        <Avatar className={cn(sidebarCollapsed && "h-8 w-8")}>
+          <AvatarImage src={user.avatarUrl} alt={user.name} />
+          <AvatarFallback>{fallback}</AvatarFallback>
+        </Avatar>
+        <span
+          className={cn(
+            'absolute bottom-0 right-0 block h-3 w-3 rounded-full border-2 border-sidebar',
+            statusClasses[user.status],
+            sidebarCollapsed && "h-2 w-2"
+          )}
+          title={statusText[user.status]}
+        />
+      </div>
+      <div className={cn("flex-1 overflow-hidden", sidebarCollapsed && "hidden")}>
+        <p className="font-semibold truncate">{user.name}</p>
+        {user.bio && (
+          <p className="text-xs text-muted-foreground truncate">{user.bio}</p>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          <button
-            onClick={handleUserClick}
-            className="w-full text-right p-2 rounded-md hover:bg-sidebar-accent transition-colors flex items-center gap-3"
-          >
-            <div className="relative">
-              <Avatar>
-                <AvatarImage src={user.avatarUrl} alt={user.name} />
-                <AvatarFallback>{fallback}</AvatarFallback>
-              </Avatar>
-              <span
-                className={cn(
-                  'absolute bottom-0 right-0 block h-3 w-3 rounded-full border-2 border-sidebar',
-                  statusClasses[user.status]
-                )}
-                title={statusText[user.status]}
-              />
-            </div>
-            <div className="flex-1 overflow-hidden">
-              <p className="font-semibold truncate">{user.name}</p>
-              {user.bio && (
-                <p className="text-xs text-muted-foreground truncate">{user.bio}</p>
-              )}
-            </div>
-          </button>
+          {sidebarCollapsed ? <div>{content}</div> : <button className='w-full'>{content}</button>}
         </TooltipTrigger>
-        {(user.bio || user.department) && (
+        {(sidebarCollapsed || user.bio || user.department) && (
             <TooltipContent side="left">
                 <div className="text-right">
                   <p className="font-semibold">{user.name}</p>
