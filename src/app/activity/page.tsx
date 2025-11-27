@@ -18,6 +18,7 @@ type DailyLog = {
   date: string;
   events: ActivityLogEvent[];
   totalActiveSeconds: number;
+  totalAwaySeconds: number;
 };
 
 const eventIcons = {
@@ -72,22 +73,27 @@ function calculateSummary(events: ActivityLogEvent[], forDate?: Date): { totalAc
 
     for (const event of sortedEvents) {
         if (lastEvent) {
+            const timeDiffSeconds = (event.timestamp - lastEvent.timestamp) / 1000;
             if (lastEvent.type === 'ACTIVE' || lastEvent.type === 'LOGIN') {
-                totalActiveSeconds += (event.timestamp - lastEvent.timestamp) / 1000;
+                totalActiveSeconds += timeDiffSeconds;
             } else if (lastEvent.type === 'AWAY') {
-                totalAwaySeconds += (event.timestamp - lastEvent.timestamp) / 1000;
+                totalAwaySeconds += timeDiffSeconds;
             }
         }
         lastEvent = event;
     }
 
-    // If the user is currently active and we are looking at today's data (or no date is selected), add the ongoing duration
+    // If the user is currently active/away and we are looking at today's data, add the ongoing duration
     const isTodayOrNoFilter = !forDate || isSameDay(forDate, new Date());
-    if (lastEvent && (lastEvent.type === 'ACTIVE' || lastEvent.type === 'LOGIN') && isTodayOrNoFilter) {
-        totalActiveSeconds += (Date.now() - lastEvent.timestamp) / 1000;
-    } else if (lastEvent && lastEvent.type === 'AWAY' && isTodayOrNoFilter){
-        totalAwaySeconds += (Date.now() - lastEvent.timestamp) / 1000;
+    if (lastEvent && isTodayOrNoFilter) {
+        const ongoingDurationSeconds = (Date.now() - lastEvent.timestamp) / 1000;
+        if (lastEvent.type === 'ACTIVE' || lastEvent.type === 'LOGIN') {
+           totalActiveSeconds += ongoingDurationSeconds;
+        } else if (lastEvent.type === 'AWAY') {
+           totalAwaySeconds += ongoingDurationSeconds;
+        }
     }
+
 
     return { totalActiveSeconds, totalAwaySeconds };
 }
@@ -110,8 +116,8 @@ export default function ActivityPage() {
   const [dateFilter, setDateFilter] = useState<Date | undefined>();
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
 
-  const { processedLog, overallSummary } = useMemo(() => {
-    if (!rawLogDTO) return { processedLog: [], overallSummary: { totalActiveSeconds: 0, totalAwaySeconds: 0 } };
+  const processedLog = useMemo(() => {
+    if (!rawLogDTO) return [];
     
     const rawLog: ActivityLogEvent[] = rawLogDTO.map(dto => ({
         ...dto,
@@ -119,63 +125,53 @@ export default function ActivityPage() {
     }));
 
     // --- Filter logs based on UI filters ---
-    const filteredEvents = rawLog.filter(event => {
+    const filteredEventsForDisplay = rawLog.filter(event => {
         const dateMatch = !dateFilter || isSameDay(new Date(event.timestamp), startOfDay(dateFilter));
         const typeMatch = typeFilter === 'ALL' || event.type === typeFilter;
         return dateMatch && typeMatch;
     });
     
-    // --- Calculate summary for the top table based on filtered events ---
-    const overallSummary = calculateSummary(filteredEvents, dateFilter);
+    // --- Group all events by day, ignoring the type filter for daily summary calculations ---
+    const allEventsByDay: Record<string, ActivityLogEvent[]> = {};
+    const relevantEventsForDailyTotals = dateFilter ? rawLog.filter(e => isSameDay(new Date(e.timestamp), dateFilter)) : rawLog;
     
-    // --- Group filtered events by day for the detailed list ---
-    const groupedByDay: Record<string, { events: ActivityLogEvent[] }> = {};
-     for (const event of filteredEvents) {
+    for (const event of relevantEventsForDailyTotals) {
       const dateKey = format(new Date(event.timestamp), 'eeee, MMMM do, yyyy');
-      if (!groupedByDay[dateKey]) {
-        groupedByDay[dateKey] = { events: [] };
+      if (!allEventsByDay[dateKey]) {
+        allEventsByDay[dateKey] = [];
       }
-      groupedByDay[dateKey].events.push(event);
+      allEventsByDay[dateKey].push(event);
     }
     
-    // --- Calculate daily totals for each visible card ---
-    // This should use the full day's data, regardless of the type filter, but respecting the date filter
-    const dailyTotals: Record<string, { totalActiveSeconds: number }> = {};
-    const allEventsForSelectedDay = rawLog.filter(event => {
-        return !dateFilter || isSameDay(new Date(event.timestamp), startOfDay(dateFilter));
-    });
-
-    const allEventsGroupedByDay: Record<string, { events: ActivityLogEvent[] }> = {};
-     for (const event of allEventsForSelectedDay) {
-      const dateKey = format(new Date(event.timestamp), 'eeee, MMMM do, yyyy');
-      if (!allEventsGroupedByDay[dateKey]) {
-        allEventsGroupedByDay[dateKey] = { events: [] };
-      }
-      allEventsGroupedByDay[dateKey].events.push(event);
+    // --- Group events for display (respecting type filter) ---
+    const displayEventsByDay: Record<string, ActivityLogEvent[]> = {};
+    for (const event of filteredEventsForDisplay) {
+        const dateKey = format(new Date(event.timestamp), 'eeee, MMMM do, yyyy');
+        if (!displayEventsByDay[dateKey]) {
+            displayEventsByDay[dateKey] = [];
+        }
+        displayEventsByDay[dateKey].push(event);
     }
 
-    Object.keys(allEventsGroupedByDay).forEach(dateKey => {
-        const dailyEvents = allEventsGroupedByDay[dateKey].events;
+    // --- Process into final structure ---
+    const processedLogResult: DailyLog[] = Object.keys(displayEventsByDay).map(dateKey => {
+        const dailyEventsForSummary = allEventsByDay[dateKey] || [];
         // Pass the actual date of the key to calculateSummary for accurate ongoing session calculation
-        const { totalActiveSeconds } = calculateSummary(dailyEvents, new Date(dateKey.replace(/(\d+)(st|nd|rd|th)/, "$1")));
-        dailyTotals[dateKey] = { totalActiveSeconds };
+        const { totalActiveSeconds, totalAwaySeconds } = calculateSummary(dailyEventsForSummary, new Date(dateKey.replace(/(\d+)(st|nd|rd|th)/, "$1")));
+        
+        const sortedDisplayEvents = [...displayEventsByDay[dateKey]].sort((a,b) => b.timestamp - a.timestamp);
+
+        return {
+            date: dateKey,
+            events: sortedDisplayEvents,
+            totalActiveSeconds,
+            totalAwaySeconds
+        }
     });
 
-     Object.keys(groupedByDay).forEach(dateKey => {
-        groupedByDay[dateKey].events.sort((a,b) => b.timestamp - a.timestamp);
+    return processedLogResult.sort((a,b) => {
+         return new Date(b.date.replace(/(\d+)(st|nd|rd|th)/, "$1")).getTime() - new Date(a.date.replace(/(\d+)(st|nd|rd|th)/, "$1")).getTime()
     });
-
-    const sortedDays = Object.keys(groupedByDay).sort((a,b) => {
-        return new Date(a.replace(/(\d+)(st|nd|rd|th)/, "$1")).getTime() - new Date(b.replace(/(\d+)(st|nd|rd|th)/, "$1")).getTime()
-    }).reverse();
-
-    const processedLogResult = sortedDays.map(dateKey => ({
-      date: dateKey,
-      events: groupedByDay[dateKey].events,
-      totalActiveSeconds: dailyTotals[dateKey]?.totalActiveSeconds || 0
-    }));
-
-    return { processedLog: processedLogResult, overallSummary };
 
   }, [rawLogDTO, dateFilter, typeFilter]);
 
@@ -184,8 +180,6 @@ export default function ActivityPage() {
       setDateFilter(undefined);
       setTypeFilter('ALL');
   }
-
-  const summaryTitle = dateFilter ? `Summary for ${format(dateFilter, 'MMMM do, yyyy')}` : 'Overall Summary (All Time)';
 
   return (
     <MainLayout>
@@ -230,28 +224,6 @@ export default function ActivityPage() {
                     )}
                 </CardContent>
             </Card>
-            
-            <Card className="mb-8">
-                <CardHeader>
-                    <CardTitle>{summaryTitle}</CardTitle>
-                    <CardDescription>Total active and away time based on the selected filter.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                     <Table>
-                        <TableBody>
-                            <TableRow>
-                                <TableCell className="font-medium">Total Active Time</TableCell>
-                                <TableCell className="text-right font-bold text-green-600">{formatTotalDuration(overallSummary.totalActiveSeconds)}</TableCell>
-                            </TableRow>
-                             <TableRow>
-                                <TableCell className="font-medium">Total Away Time</TableCell>
-                                <TableCell className="text-right font-bold text-yellow-600">{formatTotalDuration(overallSummary.totalAwaySeconds)}</TableCell>
-                            </TableRow>
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
-
 
             <div className="space-y-8">
                 {loading ? (
@@ -271,14 +243,22 @@ export default function ActivityPage() {
                     return (
                         <Card key={dayLog.date}>
                         <CardHeader>
-                            <div className="flex justify-between items-center">
-                                <CardTitle className="text-xl">{dayLog.date}</CardTitle>
-                                <p className="text-sm font-medium text-muted-foreground">
-                                    Daily Active Time: <span className="font-bold text-primary">{formatTotalDuration(dayLog.totalActiveSeconds)}</span>
-                                </p>
-                            </div>
+                            <CardTitle className="text-xl">{dayLog.date}</CardTitle>
+                             <CardDescription>Summary of your activity for this day.</CardDescription>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="pt-2">
+                             <Table className="mb-6 border-b">
+                                <TableBody>
+                                    <TableRow>
+                                        <TableCell className="font-medium">Daily Active Time</TableCell>
+                                        <TableCell className="text-right font-bold text-green-600">{formatTotalDuration(dayLog.totalActiveSeconds)}</TableCell>
+                                    </TableRow>
+                                    <TableRow>
+                                        <TableCell className="font-medium">Daily Away Time</TableCell>
+                                        <TableCell className="text-right font-bold text-yellow-600">{formatTotalDuration(dayLog.totalAwaySeconds)}</TableCell>
+                                    </TableRow>
+                                </TableBody>
+                            </Table>
                             <ul className="space-y-4">
                             {dayLog.events.map((event, index) => {
                                 const prevEvent = dayLog.events[index + 1];
