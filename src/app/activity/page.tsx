@@ -11,7 +11,11 @@ import { DatePicker } from '@/components/ui/datepicker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import MainLayout from '@/components/MainLayout';
 
-type GroupedLog = Record<string, ActivityLogEvent[]>;
+type DailyLog = {
+  date: string;
+  events: ActivityLogEvent[];
+  totalActiveSeconds: number;
+};
 
 const eventIcons = {
   LOGIN: <LogIn className="text-green-500" />,
@@ -58,7 +62,7 @@ export default function ActivityPage() {
     setRawLog(getActivityLog()); 
   }, []);
 
-  const filteredAndGroupedLog = useMemo(() => {
+  const processedLog = useMemo(() => {
     let log = rawLog;
 
     if (dateFilter) {
@@ -70,30 +74,27 @@ export default function ActivityPage() {
       log = log.filter(event => event.type === typeFilter);
     }
     
-    // Reverse here so that events within a day are newest first
-    const reversedLog = [...log].reverse();
+    // Process everything in one go
+    const groupedByDay: Record<string, { events: ActivityLogEvent[], totalActiveSeconds: number }> = {};
 
-    const grouped = reversedLog.reduce((acc, event) => {
-      const date = format(new Date(event.timestamp), 'eeee, MMMM do, yyyy');
-      if (!acc[date]) {
-        acc[date] = [];
+    // Group events by day first
+    for (const event of log) {
+      const dateKey = format(new Date(event.timestamp), 'eeee, MMMM do, yyyy');
+      if (!groupedByDay[dateKey]) {
+        groupedByDay[dateKey] = { events: [], totalActiveSeconds: 0 };
       }
-      acc[date].push(event);
-      return acc;
-    }, {} as GroupedLog);
-
-    return grouped;
-  }, [rawLog, dateFilter, typeFilter]);
-  
-  const dailyTotals = useMemo(() => {
-    const totals: Record<string, number> = {};
-    Object.keys(filteredAndGroupedLog).forEach(dateStr => {
-      const events = filteredAndGroupedLog[dateStr].slice().reverse(); // original order
+      groupedByDay[dateKey].events.push(event);
+    }
+    
+    // Calculate totals and sort events for each day
+    Object.keys(groupedByDay).forEach(dateKey => {
+      const dayData = groupedByDay[dateKey];
+      const dayEvents = dayData.events.slice().sort((a,b) => a.timestamp - b.timestamp); // sort ascending
       let totalMilliseconds = 0;
       let lastActiveTimestamp: number | null = null;
-      const day = new Date(events[0].timestamp);
+      const day = new Date(dayEvents[0].timestamp);
 
-      for (const event of events) {
+      for (const event of dayEvents) {
         if (event.type === 'ACTIVE' || event.type === 'LOGIN') {
             if (lastActiveTimestamp === null) {
                 lastActiveTimestamp = event.timestamp;
@@ -107,10 +108,21 @@ export default function ActivityPage() {
       if (lastActiveTimestamp !== null && isSameDay(day, new Date())) {
         totalMilliseconds += Date.now() - lastActiveTimestamp;
       }
-      totals[dateStr] = totalMilliseconds / 1000;
+      dayData.totalActiveSeconds = totalMilliseconds / 1000;
+      
+      // Reverse events for display (newest first)
+      dayData.events.reverse();
     });
-    return totals;
-  }, [filteredAndGroupedLog])
+    
+    // Sort days chronologically descending
+    const sortedDays = Object.keys(groupedByDay).sort((a,b) => new Date(b).getTime() - new Date(a).getTime());
+
+    return sortedDays.map(dateKey => ({
+      date: dateKey,
+      ...groupedByDay[dateKey]
+    }));
+
+  }, [rawLog, dateFilter, typeFilter]);
 
 
   const clearFilters = () => {
@@ -158,30 +170,28 @@ export default function ActivityPage() {
 
 
             <div className="space-y-8">
-                {Object.keys(filteredAndGroupedLog).length === 0 ? (
+                {processedLog.length === 0 ? (
                 <Card>
                     <CardContent className="p-6 text-center">
                     <p className="text-muted-foreground">No activity matches the current filters.</p>
                     </CardContent>
                 </Card>
                 ) : (
-                Object.entries(filteredAndGroupedLog).map(([date, events]) => {
-                    const dailyTotalInSeconds = dailyTotals[date] || 0;
-
+                processedLog.map((dayLog) => {
                     return (
-                        <Card key={date}>
+                        <Card key={dayLog.date}>
                         <CardHeader>
                             <div className="flex justify-between items-center">
-                                <CardTitle>{date}</CardTitle>
+                                <CardTitle>{dayLog.date}</CardTitle>
                                 <p className="text-sm font-medium text-muted-foreground">
-                                    Total Active Time: <span className="font-bold text-primary">{formatTotalDuration(dailyTotalInSeconds)}</span>
+                                    Total Active Time: <span className="font-bold text-primary">{formatTotalDuration(dayLog.totalActiveSeconds)}</span>
                                 </p>
                             </div>
                         </CardHeader>
                         <CardContent>
                             <ul className="space-y-4">
-                            {events.map((event, index) => {
-                                const prevEvent = events[index + 1];
+                            {dayLog.events.map((event, index) => {
+                                const prevEvent = dayLog.events[index + 1];
                                 let duration = null;
 
                                 if(prevEvent) {
