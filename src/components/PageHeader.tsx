@@ -2,7 +2,7 @@
 
 import { Button } from '@/components/ui/button';
 import { SidebarTrigger } from '@/components/ui/sidebar';
-import { User, LogIn, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { User, LogIn, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import Link from 'next/link';
 import { useSidebar } from '@/components/ui/sidebar';
 
@@ -20,7 +20,10 @@ export default function PageHeader() {
   return (
     <div className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-background/80 px-4 backdrop-blur-sm sm:px-6">
       <div className="flex items-center gap-2">
-         {/* This is a trigger for a potential left sidebar, keeping it for now */}
+        <SidebarTrigger className="flex items-center gap-2">
+          {open ? <PanelLeftClose /> : <PanelLeftOpen />}
+          <span className="sr-only">Toggle user directory</span>
+        </SidebarTrigger>
       </div>
       <div className="flex items-center gap-4">
         {isAuthenticated ? (
@@ -28,8 +31,8 @@ export default function PageHeader() {
             {isAdmin && (
               <Button variant="outline" asChild>
                 <Link href="/admin">
-                  <User className="ltr:mr-2 rtl:ml-2" />
-                  پنل ادمین
+                  <User className="mr-2" />
+                  Admin Panel
                 </Link>
               </Button>
             )}
@@ -37,15 +40,11 @@ export default function PageHeader() {
         ) : (
           <Button asChild>
             <Link href="/login">
-              <LogIn className="ltr:mr-2 rtl:ml-2" />
-              ورود
+              <LogIn className="mr-2" />
+              Login
             </Link>
           </Button>
         )}
-        <SidebarTrigger className="flex items-center gap-2">
-          {open ? <PanelRightClose /> : <PanelRightOpen />}
-          <span className="sr-only">Toggle user directory</span>
-        </SidebarTrigger>
       </div>
     </div>
   );

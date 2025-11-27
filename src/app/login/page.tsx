@@ -22,7 +22,7 @@ export default function LoginPage() {
       // In a real app, you'd set a session cookie here
       router.push('/');
     } else {
-      setError('نام کاربری یا رمز عبور اشتباه است.');
+      setError('Incorrect username or password.');
     }
   };
 
@@ -41,12 +41,12 @@ export default function LoginPage() {
             <Puzzle className="h-8 w-8" />
           </div>
           <CardTitle className="font-headline text-3xl">OrgConnect</CardTitle>
-          <CardDescription>ورود به پنل کاربری سازمان</CardDescription>
+          <CardDescription>Login to the organization panel</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">نام کاربری</Label>
+              <Label htmlFor="email">Username</Label>
               <Input
                 id="email"
                 type="email"
@@ -54,24 +54,22 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                dir="ltr"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">رمز عبور</Label>
+              <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
                 type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                dir="ltr"
                 placeholder="password"
               />
             </div>
             {error && <p className="text-sm font-medium text-destructive">{error}</p>}
             <Button type="submit" className="w-full !mt-6">
-              ورود
+              Login
             </Button>
           </form>
         </CardContent>

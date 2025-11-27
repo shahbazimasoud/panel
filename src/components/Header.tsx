@@ -12,7 +12,7 @@ export default function Header() {
         </h1>
       </div>
       <p className="text-lg text-muted-foreground">
-        پرتال جامع سامانه‌های سازمانی. دسترسی سریع و آسان به تمام ابزارهای شما.
+        The comprehensive portal for your organizational systems. Quick and easy access to all your tools.
       </p>
     </header>
   );

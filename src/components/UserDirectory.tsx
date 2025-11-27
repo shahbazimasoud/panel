@@ -8,14 +8,13 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Search, SlidersHorizontal, Users } from 'lucide-react';
-import { SidebarHeader, SidebarContent, SidebarFooter, useSidebar } from '@/components/ui/sidebar';
+import { SidebarHeader, SidebarContent, SidebarFooter } from '@/components/ui/sidebar';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 
 export default function UserDirectory() {
   const [searchTerm, setSearchTerm] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('all');
   const [visibleCount, setVisibleCount] = useState(20);
-  const { state: sidebarState } = useSidebar();
 
   const filteredUsers = useMemo(() => {
     return users
@@ -26,8 +25,6 @@ export default function UserDirectory() {
         (user) => departmentFilter === 'all' || user.department === departmentFilter
       );
   }, [searchTerm, departmentFilter]);
-
-  const sidebarCollapsed = sidebarState === 'collapsed';
   
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
@@ -37,15 +34,15 @@ export default function UserDirectory() {
             <TooltipTrigger asChild>
               <Users className="h-6 w-6" />
             </TooltipTrigger>
-            <TooltipContent side="left">اعضای سازمان</TooltipContent>
+            <TooltipContent side="right">Organization Members</TooltipContent>
           </Tooltip>
-          <h2 className="text-xl font-bold font-headline group-data-[collapsible=icon]:hidden">اعضای سازمان</h2>
+          <h2 className="text-xl font-bold font-headline group-data-[collapsible=icon]:hidden">Members</h2>
         </div>
         <div className="relative mt-4 group-data-[collapsible=icon]:hidden">
-          <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="جستجو..."
-            className="w-full bg-background pr-9"
+            placeholder="Search..."
+            className="w-full bg-background pl-9"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -57,10 +54,10 @@ export default function UserDirectory() {
               onValueChange={setDepartmentFilter}
             >
               <SelectTrigger className="w-full bg-background">
-                <SelectValue placeholder="فیلتر دپارتمان" />
+                <SelectValue placeholder="Filter department" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">همه دپارتمان‌ها</SelectItem>
+                <SelectItem value="all">All Departments</SelectItem>
                 {departments.map((dep) => (
                   <SelectItem key={dep} value={dep}>
                     {dep}
@@ -75,7 +72,7 @@ export default function UserDirectory() {
         <ScrollArea className="h-full">
           <div className="space-y-1 p-4 pt-0 group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:pt-0">
             {filteredUsers.slice(0, visibleCount).map((user) => (
-              <UserListItem key={user.id} user={user} sidebarCollapsed={sidebarCollapsed} />
+              <UserListItem key={user.id} user={user} />
             ))}
           </div>
         </ScrollArea>
@@ -88,7 +85,7 @@ export default function UserDirectory() {
             className="w-full"
             onClick={() => setVisibleCount((prev) => prev + 20)}
           >
-            نمایش بیشتر
+            Show More
           </Button>
         </SidebarFooter>
       )}

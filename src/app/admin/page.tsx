@@ -6,16 +6,16 @@ export default function AdminPage() {
     <div className="flex min-h-screen items-center justify-center bg-muted/40">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>پنل ادمین</CardTitle>
+          <CardTitle>Admin Panel</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p>به پنل مدیریت OrgConnect خوش آمدید.</p>
+          <p>Welcome to the OrgConnect Admin Panel.</p>
           <p>
-            در این بخش می‌توانید سامانه‌ها، کاربران و تنظیمات سایت را مدیریت کنید.
-            این بخش در حال توسعه است.
+            Here you can manage systems, users, and site settings.
+            This section is under development.
           </p>
           <Link href="/" className="text-primary hover:underline">
-             بازگشت به صفحه اصلی
+             Back to Home
           </Link>
         </CardContent>
       </Card>

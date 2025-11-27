@@ -5,10 +5,10 @@ import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useSidebar } from '@/components/ui/sidebar';
 
 type UserListItemProps = {
   user: User;
-  sidebarCollapsed?: boolean;
 };
 
 const statusClasses = {
@@ -18,20 +18,22 @@ const statusClasses = {
 };
 
 const statusText = {
-  online: 'آنلاین',
-  idle: 'غیرفعال',
-  offline: 'آفلاین',
+  online: 'Online',
+  idle: 'Idle',
+  offline: 'Offline',
 };
 
-export default function UserListItem({ user, sidebarCollapsed = false }: UserListItemProps) {
+export default function UserListItem({ user }: UserListItemProps) {
   const { toast } = useToast();
+  const { state: sidebarState } = useSidebar();
+  const sidebarCollapsed = sidebarState === 'collapsed';
 
   const handleUserClick = () => {
     // In a real app, this would integrate with Cisco Jabber or another messenger
     // For example: window.location.href = `jabber:user@example.com`;
     toast({
-      title: 'ارسال پیام',
-      description: `پنجره چت با ${user.name} باز می‌شود... (شبیه‌سازی)`,
+      title: 'Send Message',
+      description: `Opening chat window with ${user.name}... (simulation)`,
     });
     console.log(`Starting chat with ${user.name}`);
   };
@@ -45,7 +47,7 @@ export default function UserListItem({ user, sidebarCollapsed = false }: UserLis
     <div
       onClick={handleUserClick}
       className={cn(
-        "w-full text-right p-2 rounded-md hover:bg-sidebar-accent transition-colors flex items-center gap-3 cursor-pointer",
+        "w-full text-left p-2 rounded-md hover:bg-sidebar-accent transition-colors flex items-center gap-3 cursor-pointer",
         sidebarCollapsed && "justify-center"
       )}
     >
@@ -79,8 +81,8 @@ export default function UserListItem({ user, sidebarCollapsed = false }: UserLis
           {sidebarCollapsed ? <div>{content}</div> : <button className='w-full'>{content}</button>}
         </TooltipTrigger>
         {(sidebarCollapsed || user.bio || user.department) && (
-            <TooltipContent side="left">
-                <div className="text-right">
+            <TooltipContent side="right">
+                <div className="text-left">
                   <p className="font-semibold">{user.name}</p>
                   <p className="text-sm text-muted-foreground">{user.department}</p>
                   {user.bio && <p className="text-sm mt-1">{user.bio}</p>}
