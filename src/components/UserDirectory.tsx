@@ -8,13 +8,14 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Search, SlidersHorizontal, Users } from 'lucide-react';
-import { SidebarHeader, SidebarContent, SidebarFooter } from '@/components/ui/sidebar';
+import { SidebarHeader, SidebarContent, SidebarFooter, useSidebar } from '@/components/ui/sidebar';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 
 export default function UserDirectory() {
   const [searchTerm, setSearchTerm] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('all');
   const [visibleCount, setVisibleCount] = useState(20);
+  const { open } = useSidebar();
 
   const filteredUsers = useMemo(() => {
     return users
@@ -68,26 +69,30 @@ export default function UserDirectory() {
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="p-0">
-        <ScrollArea className="h-full">
-          <div className="space-y-1 p-4 pt-0 group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:pt-0">
-            {filteredUsers.slice(0, visibleCount).map((user) => (
-              <UserListItem key={user.id} user={user} />
-            ))}
-          </div>
-        </ScrollArea>
-      </SidebarContent>
+      {open && (
+        <>
+          <SidebarContent className="p-0">
+            <ScrollArea className="h-full">
+              <div className="space-y-1 p-4 pt-0 group-data-[collapsible=icon]:p-2 group-data-[collapsible=icon]:pt-0">
+                {filteredUsers.slice(0, visibleCount).map((user) => (
+                  <UserListItem key={user.id} user={user} />
+                ))}
+              </div>
+            </ScrollArea>
+          </SidebarContent>
 
-      {visibleCount < filteredUsers.length && (
-        <SidebarFooter className="p-4 border-t group-data-[collapsible=icon]:hidden">
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={() => setVisibleCount((prev) => prev + 20)}
-          >
-            Show More
-          </Button>
-        </SidebarFooter>
+          {visibleCount < filteredUsers.length && (
+            <SidebarFooter className="p-4 border-t group-data-[collapsible=icon]:hidden">
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => setVisibleCount((prev) => prev + 20)}
+              >
+                Show More
+              </Button>
+            </SidebarFooter>
+          )}
+        </>
       )}
     </div>
   );
