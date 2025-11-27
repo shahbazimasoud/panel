@@ -11,7 +11,7 @@ import { DatePicker } from '@/components/ui/datepicker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import MainLayout from '@/components/MainLayout';
 import Link from 'next/link';
-import { useFirestore, useUser, useCollection } from '@/firebase';
+import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where, orderBy } from 'firebase/firestore';
 
 type DailyLog = {
@@ -67,16 +67,16 @@ export default function ActivityPage() {
   const firestore = useFirestore();
   const { user } = useUser();
   
-  const activityLogQuery = useMemo(() => {
+  const activityLogQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
+    // The orderBy clause is removed to avoid needing a composite index
     return query(
         collection(firestore, 'activityLog'),
-        where('userId', '==', user.uid),
-        orderBy('timestamp', 'desc')
+        where('userId', '==', user.uid)
     );
   }, [firestore, user]);
 
-  const { data: rawLogDTO, loading } = useCollection<ActivityLogEventDTO>(activityLogQuery);
+  const { data: rawLogDTO, isLoading: loading } = useCollection<ActivityLogEventDTO>(activityLogQuery);
 
   const [dateFilter, setDateFilter] = useState<Date | undefined>();
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
@@ -87,7 +87,7 @@ export default function ActivityPage() {
     const rawLog: ActivityLogEvent[] = rawLogDTO.map(dto => ({
         ...dto,
         timestamp: dto.timestamp.toMillis(),
-    }));
+    })).sort((a, b) => b.timestamp - a.timestamp); // Sort on the client
 
     const filteredLog = rawLog.filter(event => {
       const isDateMatch = !dateFilter || isSameDay(new Date(event.timestamp), startOfDay(dateFilter));
