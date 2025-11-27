@@ -7,6 +7,7 @@ export interface User {
   status: UserStatus;
   department: string;
   bio?: string;
+  extension?: string;
 }
 
 export interface System {
