@@ -42,7 +42,7 @@ export default function PageHeader() {
             </Link>
           </Button>
         )}
-        <SidebarTrigger>
+        <SidebarTrigger className="flex items-center gap-2">
           {open ? <PanelRightClose /> : <PanelRightOpen />}
           <span className="sr-only">Toggle user directory</span>
         </SidebarTrigger>

@@ -1,8 +1,9 @@
-import { SidebarProvider, Sidebar, SidebarInset } from '@/components/ui/sidebar';
+import { SidebarProvider, Sidebar, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import Header from '@/components/Header';
 import SystemGrid from '@/components/SystemGrid';
 import UserDirectory from '@/components/UserDirectory';
 import PageHeader from '@/components/PageHeader';
+import { PanelLeft } from 'lucide-react';
 
 export default function Home() {
   return (
@@ -16,7 +17,7 @@ export default function Home() {
           </main>
         </SidebarInset>
         <Sidebar side="right" collapsible="icon" className="border-l">
-          <UserDirectory />
+            <UserDirectory />
         </Sidebar>
       </div>
     </SidebarProvider>

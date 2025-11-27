@@ -8,7 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Search, SlidersHorizontal, Users } from 'lucide-react';
-import { SidebarHeader, SidebarContent, SidebarFooter, SidebarGroupLabel, useSidebar } from '@/components/ui/sidebar';
+import { SidebarHeader, SidebarContent, SidebarFooter, useSidebar } from '@/components/ui/sidebar';
 import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
 
 export default function UserDirectory() {
