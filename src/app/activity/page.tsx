@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { calculateDailyTotal } from '@/lib/activity-log';
 import type { ActivityLogEvent, ActivityLogEventDTO } from '@/lib/types';
-import { LogIn, LogOut, Coffee, Timer, FilterX, ArrowLeft, Monitor, Smartphone } from 'lucide-react';
+import { LogIn, LogOut, Coffee, Timer, FilterX, ArrowLeft, Monitor, Smartphone, Globe } from 'lucide-react';
 import { format, formatDuration, intervalToDuration, startOfDay, isSameDay } from 'date-fns';
 import { DatePicker } from '@/components/ui/datepicker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -86,7 +86,7 @@ export default function ActivityPage() {
     const rawLog: ActivityLogEvent[] = rawLogDTO.map(dto => ({
         ...dto,
         timestamp: dto.timestamp.toMillis(),
-    })).sort((a, b) => a.timestamp - b.timestamp); // Sort all logs once
+    }));
 
     const groupedByDay: Record<string, { events: ActivityLogEvent[], totalActiveSeconds: number }> = {};
     for (const event of rawLog) {
@@ -98,7 +98,8 @@ export default function ActivityPage() {
     }
     
     Object.keys(groupedByDay).forEach(dateKey => {
-        groupedByDay[dateKey].totalActiveSeconds = calculateDailyTotal(groupedByDay[dateKey].events, new Date(dateKey));
+        const dailyEvents = groupedByDay[dateKey].events;
+        groupedByDay[dateKey].totalActiveSeconds = calculateDailyTotal(dailyEvents, new Date(dateKey));
     });
 
     const filteredLog = rawLog.filter(event => {
@@ -232,12 +233,20 @@ export default function ActivityPage() {
                                         <div className="flex-1 pt-1.5">
                                             <div className="flex items-center justify-between">
                                                 <p className="font-medium">{eventText[event.type]}</p>
-                                                {event.deviceInfo && (
-                                                    <div className="flex items-center text-xs text-muted-foreground">
-                                                        <DeviceIcon device={event.deviceInfo.device} os={event.deviceInfo.os} />
-                                                        {event.deviceInfo.device}, {event.deviceInfo.os}, {event.deviceInfo.browser}
-                                                    </div>
-                                                )}
+                                                <div className="text-xs text-muted-foreground space-y-1 text-right">
+                                                    {event.deviceInfo && (
+                                                        <div className="flex items-center justify-end">
+                                                            <DeviceIcon device={event.deviceInfo.device} os={event.deviceInfo.os} />
+                                                            {event.deviceInfo.device}, {event.deviceInfo.os}, {event.deviceInfo.browser}
+                                                        </div>
+                                                    )}
+                                                     {event.ipAddress && (
+                                                        <div className="flex items-center justify-end">
+                                                            <Globe className="mr-2 h-4 w-4" />
+                                                            {event.ipAddress}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                             <p className="text-sm text-muted-foreground">
                                                 {format(new Date(event.timestamp), 'HH:mm:ss')}
@@ -265,3 +274,5 @@ export default function ActivityPage() {
     </MainLayout>
   );
 }
+
+    

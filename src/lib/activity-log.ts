@@ -60,6 +60,8 @@ export const logActivity = (firestore: Firestore, userId: string, type: Activity
     userId,
     type,
     deviceInfo,
+    ipAddress: 'N/A', // Requires server-side implementation
+    macAddress: 'N/A', // Cannot be retrieved from browser
   };
   
   const activityCollection = collection(firestore, 'activityLog');
@@ -88,7 +90,6 @@ export const logActivity = (firestore: Firestore, userId: string, type: Activity
 
 export const getTodayTotalDuration = async (firestore: Firestore, userId: string): Promise<number> => {
     const today = new Date();
-    const startOfToday = startOfDay(today);
     
     const activityCollection = collection(firestore, 'activityLog');
     const q = query(
@@ -104,8 +105,9 @@ export const getTodayTotalDuration = async (firestore: Firestore, userId: string
             timestamp: data.timestamp.toMillis(),
         };
     })
-    .filter(event => event.timestamp >= startOfToday.getTime())
-    .sort((a, b) => a.timestamp - b.timestamp);
+    .filter(event => isSameDay(new Date(event.timestamp), today));
+    
+    events.sort((a, b) => a.timestamp - b.timestamp);
 
     return calculateDailyTotal(events, today);
 };
@@ -135,3 +137,5 @@ export const calculateDailyTotal = (dailyEvents: ActivityLogEvent[], date: Date)
 
     return totalMilliseconds / 1000;
 };
+
+    

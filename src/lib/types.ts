@@ -38,9 +38,13 @@ export type ActivityLogEventDTO = {
     os: string;
     browser: string;
   };
+  ipAddress?: string;
+  macAddress?: string;
 };
 
 
 export type ActivityLogEvent = Omit<ActivityLogEventDTO, 'timestamp'> & {
   timestamp: number; // as milliseconds
 };
+
+    
