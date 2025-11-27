@@ -12,23 +12,14 @@ import { useToast } from '@/hooks/use-toast';
 import { users } from '@/lib/data';
 import Link from 'next/link';
 import MainLayout from '@/components/MainLayout';
-
-// This is a mock. In a real app, you'd get this from a session/context.
-const useAuth = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-
-  useEffect(() => {
-    setIsAuthenticated(localStorage.getItem('isAuthenticated') === 'true');
-  }, []);
-
-  const user = isAuthenticated ? users.find((u) => u.id === '1') : null; // Mock: Arash Shams
-  return { user };
-};
+import { useUser } from '@/firebase'; // Changed
 
 export default function ProfilePage() {
-  const { user } = useAuth();
+  const { user: authUser } = useUser(); // Changed
   const { toast } = useToast();
-  const router = useRouter();
+  
+  // This is a mock. In a real app, you'd get this from your DB based on authUser.uid
+  const user = authUser ? users.find((u) => u.email === authUser.email) : null;
   
   const [bio, setBio] = useState('');
   const [charCount, setCharCount] = useState(0);
@@ -42,8 +33,13 @@ export default function ProfilePage() {
   }, [user]);
 
   if (!user) {
-    // This can be a loading state or null if MainLayout handles redirection
-    return null;
+    return (
+        <MainLayout>
+             <div className="container mx-auto max-w-3xl p-4 sm:p-6 lg:p-8">
+                Loading profile...
+            </div>
+        </MainLayout>
+    );
   }
   
   const handleBioChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -56,8 +52,7 @@ export default function ProfilePage() {
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real app, you would save this to your backend.
-    // For now, we can update the mock data if we want, but it won't persist.
+    // In a real app, you would save this to your backend (e.g., Firestore).
     const userIndex = users.findIndex(u => u.id === user.id);
     if(userIndex !== -1) {
         users[userIndex].bio = bio;

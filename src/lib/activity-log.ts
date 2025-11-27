@@ -1,9 +1,7 @@
 'use client';
-
-import { ActivityLogEvent } from './types';
+import { addDoc, collection, getDocs, query, where, orderBy, Timestamp, Firestore } from 'firebase/firestore';
+import type { ActivityLogEvent, ActivityLogEventDTO } from './types';
 import { isSameDay, startOfDay } from 'date-fns';
-
-const ACTIVITY_LOG_KEY = 'orgconnect-activity-log';
 
 function getDeviceInfo() {
     if (typeof window === 'undefined') {
@@ -15,19 +13,16 @@ function getDeviceInfo() {
     let os = 'Unknown';
     let browser = 'Unknown';
 
-    // Device
     if (/Mobile|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua)) {
         device = 'Phone';
     }
     
-    // OS
     if (/Windows/i.test(ua)) os = 'Windows';
     else if (/Android/i.test(ua)) os = 'Android';
     else if (/iPhone|iPad|iPod/i.test(ua)) os = 'iOS';
     else if (/Mac/i.test(ua)) os = 'macOS';
     else if (/Linux/i.test(ua)) os = 'Linux';
     
-    // Browser
     if (/Edg/i.test(ua)) browser = 'Edge';
     else if (/Chrome/i.test(ua)) browser = 'Chrome';
     else if (/Firefox/i.test(ua)) browser = 'Firefox';
@@ -41,44 +36,70 @@ function getDeviceInfo() {
     }
     
     if (device === 'Computer' && os === 'macOS') {
-      // Could be MacBook or iMac etc, we'll just say Laptop for simplicity
       device = 'Laptop';
     } else if (device === 'Computer') {
         device = 'PC';
     }
 
-
     return { device, os, browser };
 }
 
-export const logActivity = (type: ActivityLogEvent['type']) => {
-  const log: ActivityLogEvent[] = JSON.parse(localStorage.getItem(ACTIVITY_LOG_KEY) || '[]');
-  
-  // To prevent logging duplicate events, check the last event type.
-  if (log.length > 0 && log[log.length - 1].type === type) {
+// A simple in-memory cache to prevent logging the same event type consecutively.
+let lastEventType: ActivityLogEvent['type'] | null = null;
+
+export const logActivity = async (firestore: Firestore, userId: string, type: ActivityLogEvent['type']) => {
+  if (lastEventType === type) {
     return;
   }
+  lastEventType = type;
 
   const deviceInfo = getDeviceInfo();
+  const event: ActivityLogEventDTO = {
+    userId,
+    type,
+    timestamp: Timestamp.now(),
+    deviceInfo,
+  };
   
-  log.push({ type, timestamp: Date.now(), deviceInfo });
-  localStorage.setItem(ACTIVITY_LOG_KEY, JSON.stringify(log));
+  try {
+    const activityCollection = collection(firestore, 'activityLog');
+    await addDoc(activityCollection, event);
+  } catch (error) {
+    console.error("Error logging activity to Firestore:", error);
+    // Reset last event type if logging fails to allow retry
+    lastEventType = null;
+  }
 };
 
-export const getActivityLog = (): ActivityLogEvent[] => {
-  return JSON.parse(localStorage.getItem(ACTIVITY_LOG_KEY) || '[]');
+
+export const getTodayTotalDuration = async (firestore: Firestore, userId: string): Promise<number> => {
+    const today = new Date();
+    const startOfToday = startOfDay(today);
+    
+    const activityCollection = collection(firestore, 'activityLog');
+    const q = query(
+        activityCollection,
+        where('userId', '==', userId),
+        where('timestamp', '>=', Timestamp.fromDate(startOfToday)),
+        orderBy('timestamp', 'asc')
+    );
+
+    const querySnapshot = await getDocs(q);
+    const events: ActivityLogEvent[] = querySnapshot.docs.map(doc => {
+        const data = doc.data() as ActivityLogEventDTO;
+        return {
+            ...data,
+            timestamp: data.timestamp.toMillis(),
+        };
+    });
+
+    return calculateDailyTotal(events, today);
 };
 
-export const calculateDailyTotal = (allEvents: ActivityLogEvent[], date: Date): number => {
+
+export const calculateDailyTotal = (dailyEvents: ActivityLogEvent[], date: Date): number => {
     let totalMilliseconds = 0;
     let lastActiveTimestamp: number | null = null;
-
-    const startOfTargetDay = startOfDay(date);
-
-    const dailyEvents = allEvents.filter(e => isSameDay(new Date(e.timestamp), startOfTargetDay))
-                                 .slice()
-                                 .sort((a,b) => a.timestamp - b.timestamp);
-
 
     for (const event of dailyEvents) {
         if (event.type === 'ACTIVE' || event.type === 'LOGIN') {
@@ -91,20 +112,9 @@ export const calculateDailyTotal = (allEvents: ActivityLogEvent[], date: Date): 
         }
     }
     
-    // If the user is currently active on the target day (which would be today)
     if (lastActiveTimestamp !== null && isSameDay(date, new Date())) {
         totalMilliseconds += Date.now() - lastActiveTimestamp;
     }
 
     return totalMilliseconds / 1000;
-}
-
-
-export const getTodayTotalDuration = (): number => {
-    const log = getActivityLog();
-    return calculateDailyTotal(log, new Date());
 };
-
-export const clearActivityLog = () => {
-    localStorage.removeItem(ACTIVITY_LOG_KEY);
-}

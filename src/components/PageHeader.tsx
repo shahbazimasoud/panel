@@ -2,18 +2,9 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import {
-  SidebarTrigger
-} from '@/components/ui/sidebar';
-import {
-  User,
-  LogOut,
-  PanelLeftOpen,
-  Clock,
-  Settings,
-} from 'lucide-react';
+import { SidebarTrigger } from '@/components/ui/sidebar';
+import { User, LogOut, PanelLeftOpen, Clock, Settings } from 'lucide-react';
 import Link from 'next/link';
-import { useSidebar } from '@/components/ui/sidebar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,31 +19,8 @@ import { cn } from '@/lib/utils';
 import type { UserStatus } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 import { logActivity, getTodayTotalDuration } from '@/lib/activity-log';
-
-// This is a mock. In a real app, you'd get this from a session/context.
-const useAuth = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-
-  useEffect(() => {
-    const loggedIn = localStorage.getItem('isAuthenticated') === 'true';
-    setIsAuthenticated(loggedIn);
-  }, []);
-
-  const logout = () => {
-    logActivity('LOGOUT');
-    localStorage.removeItem('isAuthenticated');
-    setIsAuthenticated(false);
-  }
-
-  const user = isAuthenticated ? users.find((u) => u.id === '1') : null; // Mock: Arash Shams
-
-  return {
-    isAuthenticated,
-    user,
-    isAdmin: isAuthenticated && user?.email === 'admin@example.com', // Example admin logic
-    logout
-  };
-};
+import { useAuth, useFirestore, useUser } from '@/firebase'; // Changed
+import { signOut } from 'firebase/auth'; // Changed
 
 function formatDuration(seconds: number) {
   if (seconds < 0) seconds = 0;
@@ -61,7 +29,7 @@ function formatDuration(seconds: number) {
   const s = Math.floor(seconds % 60);
   return [h, m, s]
     .map((v) => (v < 10 ? '0' + v : v))
-    .join(':')
+    .join(':');
 }
 
 const statusClasses: Record<UserStatus, string> = {
@@ -71,42 +39,58 @@ const statusClasses: Record<UserStatus, string> = {
 };
 
 export default function PageHeader() {
-  const { isAuthenticated, isAdmin, user, logout } = useAuth();
-  const { toggleSidebar } = useSidebar();
-  const [sessionDuration, setSessionDuration] = useState(0);
+  const auth = useAuth();
+  const firestore = useFirestore();
+  const { user: authUser, loading } = useUser();
   const router = useRouter();
-  
-  const handleVisibilityChange = useCallback(() => {
-    if (document.visibilityState === 'hidden') {
-      logActivity('AWAY');
-    } else {
-      logActivity('ACTIVE');
+  const [sessionDuration, setSessionDuration] = useState(0);
+
+  // This is a mock. In a real app, you'd get this from your DB based on authUser.uid
+  const user = authUser ? users.find((u) => u.email === authUser.email) : null;
+  const isAdmin = user?.email === 'admin@example.com';
+
+  const updateDuration = useCallback(async () => {
+    if (firestore && authUser) {
+      const duration = await getTodayTotalDuration(firestore, authUser.uid);
+      setSessionDuration(duration);
     }
-    setSessionDuration(getTodayTotalDuration());
-  }, []);
-  
+  }, [firestore, authUser]);
+
+  const handleVisibilityChange = useCallback(() => {
+    if (!firestore || !authUser) return;
+    if (document.visibilityState === 'hidden') {
+      logActivity(firestore, authUser.uid, 'AWAY');
+    } else {
+      logActivity(firestore, authUser.uid, 'ACTIVE');
+    }
+    updateDuration();
+  }, [firestore, authUser, updateDuration]);
+
   useEffect(() => {
     let timer: NodeJS.Timeout | undefined;
-    if (isAuthenticated) {
-      setSessionDuration(getTodayTotalDuration());
+    if (firestore && authUser) {
+      updateDuration(); // Initial update
 
       timer = setInterval(() => {
-        setSessionDuration(getTodayTotalDuration());
+        updateDuration();
       }, 1000);
 
       window.addEventListener('visibilitychange', handleVisibilityChange);
     }
-    
-    return () => {
-        if(timer) clearInterval(timer);
-        window.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [isAuthenticated, handleVisibilityChange]);
 
-  const handleLogout = () => {
-    logout();
+    return () => {
+      if (timer) clearInterval(timer);
+      window.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [firestore, authUser, handleVisibilityChange, updateDuration]);
+
+  const handleLogout = async () => {
+    if (auth && firestore && authUser) {
+      await logActivity(firestore, authUser.uid, 'LOGOUT');
+      await signOut(auth);
+    }
     router.push('/login');
-  }
+  };
 
   return (
     <header className="sticky top-0 z-10 flex h-16 items-center border-b bg-background/80 px-4 backdrop-blur-sm sm:px-6">
@@ -118,7 +102,7 @@ export default function PageHeader() {
           </SidebarTrigger>
         </div>
         <div className="flex items-center gap-4">
-          {isAuthenticated && user ? (
+          {user && authUser ? (
             <>
               {isAdmin && (
                 <Button variant="outline" size="sm" asChild>
@@ -128,16 +112,27 @@ export default function PageHeader() {
                   </Link>
                 </Button>
               )}
-              <Link href="/activity" className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground">
+              <Link
+                href="/activity"
+                className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
+              >
                 <Clock className="h-4 w-4" />
                 <span>{formatDuration(sessionDuration)}</span>
               </Link>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                  <Button
+                    variant="ghost"
+                    className="relative h-8 w-8 rounded-full"
+                  >
                     <Avatar className="h-8 w-8">
                       <AvatarImage src={user.avatarUrl} alt={user.name} />
-                      <AvatarFallback>{user.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+                      <AvatarFallback>
+                        {user.name
+                          .split(' ')
+                          .map((n) => n[0])
+                          .join('')}
+                      </AvatarFallback>
                     </Avatar>
                     <span
                       className={cn(
@@ -150,7 +145,9 @@ export default function PageHeader() {
                 <DropdownMenuContent className="w-56" align="end" forceMount>
                   <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">{user.name}</p>
+                      <p className="text-sm font-medium leading-none">
+                        {user.name}
+                      </p>
                       <p className="text-xs leading-none text-muted-foreground">
                         {user.email}
                       </p>
@@ -164,14 +161,18 @@ export default function PageHeader() {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleLogout}>
-                      <LogOut className="mr-2 h-4 w-4" />
-                      <span>Log out</span>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Log out</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </>
           ) : (
-            <Button variant="ghost" onClick={() => router.push('/login')}>Login</Button>
+            !loading && (
+              <Button variant="ghost" onClick={() => router.push('/login')}>
+                Login
+              </Button>
+            )
           )}
         </div>
       </div>

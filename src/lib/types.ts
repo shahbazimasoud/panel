@@ -1,3 +1,5 @@
+import { Timestamp } from 'firebase/firestore';
+
 export type UserStatus = 'online' | 'idle' | 'offline';
 
 export interface User {
@@ -27,12 +29,18 @@ export interface Guide {
   url: string;
 }
 
-export type ActivityLogEvent = {
+export type ActivityLogEventDTO = {
+  userId: string;
   type: 'LOGIN' | 'LOGOUT' | 'AWAY' | 'ACTIVE';
-  timestamp: number;
+  timestamp: Timestamp;
   deviceInfo?: {
     device: string;
     os: string;
     browser: string;
   };
+};
+
+
+export type ActivityLogEvent = Omit<ActivityLogEventDTO, 'timestamp'> & {
+  timestamp: number; // as milliseconds
 };

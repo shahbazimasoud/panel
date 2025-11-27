@@ -8,29 +8,50 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Puzzle } from 'lucide-react';
-import { logActivity } from '@/lib/activity-log';
+import { useAuth, useFirestore } from '@/firebase'; // Changed
+import { logActivity } from '@/lib/activity-log'; // Changed
+import { signInWithEmailAndPassword } from 'firebase/auth'; // Changed
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('admin@example.com');
   const [password, setPassword] = useState('password');
   const [error, setError] = useState('');
+  
+  const auth = useAuth();
+  const firestore = useFirestore();
+  const { user } = useAuth(); // Changed
 
   // Redirect if already logged in
   useEffect(() => {
-    if (localStorage.getItem('isAuthenticated') === 'true') {
+    if (user) {
       router.push('/');
     }
-  }, [router]);
+  }, [user, router]);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => { // Changed
     e.preventDefault();
-    if (email === 'admin@example.com' && password === 'password') {
-      localStorage.setItem('isAuthenticated', 'true');
-      logActivity('LOGIN');
+    setError('');
+    if (!auth || !firestore) {
+      setError("Authentication service is not available.");
+      return;
+    }
+
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      // The auth state change will be handled by the provider
+      // and the useEffect above will redirect.
+      // We can log the initial login activity here.
+      await logActivity(firestore, userCredential.user.uid, 'LOGIN');
       router.push('/');
-    } else {
-      setError('Incorrect username or password.');
+
+    } catch (err: any) {
+       if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        setError('Incorrect username or password.');
+       } else {
+        setError('An unexpected error occurred. Please try again.');
+        console.error(err);
+       }
     }
   };
 

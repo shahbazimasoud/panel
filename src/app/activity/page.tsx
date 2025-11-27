@@ -3,14 +3,16 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { getActivityLog } from '@/lib/activity-log';
-import type { ActivityLogEvent } from '@/lib/types';
-import { LogIn, LogOut, Coffee, Timer, FilterX, ArrowLeft, Monitor, Smartphone, Tablet } from 'lucide-react';
+import { calculateDailyTotal } from '@/lib/activity-log';
+import type { ActivityLogEvent, ActivityLogEventDTO } from '@/lib/types';
+import { LogIn, LogOut, Coffee, Timer, FilterX, ArrowLeft, Monitor, Smartphone } from 'lucide-react';
 import { format, formatDuration, intervalToDuration, startOfDay, isSameDay } from 'date-fns';
 import { DatePicker } from '@/components/ui/datepicker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import MainLayout from '@/components/MainLayout';
 import Link from 'next/link';
+import { useFirestore, useUser, useCollection } from '@/firebase';
+import { collection, query, where, orderBy } from 'firebase/firestore';
 
 type DailyLog = {
   date: string;
@@ -62,63 +64,49 @@ function DeviceIcon({ device, os }: { device?: string; os?: string }) {
 
 
 export default function ActivityPage() {
-  const [rawLog, setRawLog] = useState<ActivityLogEvent[]>([]);
+  const firestore = useFirestore();
+  const { user } = useUser();
+  
+  const activityLogQuery = useMemo(() => {
+    if (!firestore || !user) return null;
+    return query(
+        collection(firestore, 'activityLog'),
+        where('userId', '==', user.uid),
+        orderBy('timestamp', 'desc')
+    );
+  }, [firestore, user]);
+
+  const { data: rawLogDTO, loading } = useCollection<ActivityLogEventDTO>(activityLogQuery);
+
   const [dateFilter, setDateFilter] = useState<Date | undefined>();
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
 
-  useEffect(() => {
-    setRawLog(getActivityLog()); 
-  }, []);
-
   const processedLog = useMemo(() => {
-    let log = rawLog;
+    if (!rawLogDTO) return [];
+    
+    const rawLog: ActivityLogEvent[] = rawLogDTO.map(dto => ({
+        ...dto,
+        timestamp: dto.timestamp.toMillis(),
+    }));
 
-    const filteredLog = log.filter(event => {
+    const filteredLog = rawLog.filter(event => {
       const isDateMatch = !dateFilter || isSameDay(new Date(event.timestamp), startOfDay(dateFilter));
       const isTypeMatch = typeFilter === 'ALL' || event.type === typeFilter;
       return isDateMatch && isTypeMatch;
     });
     
-    // Process everything in one go
     const groupedByDay: Record<string, { events: ActivityLogEvent[], totalActiveSeconds: number }> = {};
 
-    // Group events by day first
-    for (const event of rawLog) { // use rawLog to calculate totals correctly, independent of type filter
+    for (const event of rawLog) { 
       const dateKey = format(new Date(event.timestamp), 'eeee, MMMM do, yyyy');
       if (!groupedByDay[dateKey]) {
         groupedByDay[dateKey] = { events: [], totalActiveSeconds: 0 };
       }
     }
     
-    // Calculate totals and sort events for each day
     Object.keys(groupedByDay).forEach(dateKey => {
-      const dayData = groupedByDay[dateKey];
-      const dayEvents = rawLog.filter(e => format(new Date(e.timestamp), 'eeee, MMMM do, yyyy') === dateKey)
-                              .slice()
-                              .sort((a,b) => a.timestamp - b.timestamp); // sort ascending
-
-      let totalMilliseconds = 0;
-      let lastActiveTimestamp: number | null = null;
-      
-      if(dayEvents.length > 0) {
-        const day = new Date(dayEvents[0].timestamp);
-
-        for (const event of dayEvents) {
-          if (event.type === 'ACTIVE' || event.type === 'LOGIN') {
-              if (lastActiveTimestamp === null) {
-                  lastActiveTimestamp = event.timestamp;
-              }
-          } else if ((event.type === 'AWAY' || event.type === 'LOGOUT') && lastActiveTimestamp !== null) {
-              totalMilliseconds += event.timestamp - lastActiveTimestamp;
-              lastActiveTimestamp = null;
-          }
-        }
-
-        if (lastActiveTimestamp !== null && isSameDay(day, new Date())) {
-          totalMilliseconds += Date.now() - lastActiveTimestamp;
-        }
-      }
-      dayData.totalActiveSeconds = totalMilliseconds / 1000;
+        const dayEvents = rawLog.filter(e => format(new Date(e.timestamp), 'eeee, MMMM do, yyyy') === dateKey);
+        groupedByDay[dateKey].totalActiveSeconds = calculateDailyTotal(dayEvents, new Date(dateKey));
     });
 
     const displayGroupedByDay: Record<string, { events: ActivityLogEvent[] }> = {};
@@ -133,8 +121,6 @@ export default function ActivityPage() {
         displayGroupedByDay[dateKey].events.sort((a,b) => b.timestamp - a.timestamp); // newest first
     });
 
-    
-    // Sort days chronologically descending
     const sortedDays = Object.keys(displayGroupedByDay).sort((a,b) => {
         return new Date(b).getTime() - new Date(a).getTime()
     });
@@ -145,7 +131,7 @@ export default function ActivityPage() {
       totalActiveSeconds: groupedByDay[dateKey]?.totalActiveSeconds || 0
     }));
 
-  }, [rawLog, dateFilter, typeFilter]);
+  }, [rawLogDTO, dateFilter, typeFilter]);
 
 
   const clearFilters = () => {
@@ -199,7 +185,13 @@ export default function ActivityPage() {
 
 
             <div className="space-y-8">
-                {processedLog.length === 0 ? (
+                {loading ? (
+                    <Card>
+                        <CardContent className="p-6 text-center">
+                        <p className="text-muted-foreground">Loading activity...</p>
+                        </CardContent>
+                    </Card>
+                ) : processedLog.length === 0 ? (
                 <Card>
                     <CardContent className="p-6 text-center">
                     <p className="text-muted-foreground">No activity matches the current filters.</p>

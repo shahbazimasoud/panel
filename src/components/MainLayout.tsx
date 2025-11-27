@@ -5,17 +5,27 @@ import { useRouter } from 'next/navigation';
 import { SidebarProvider, Sidebar, SidebarInset } from '@/components/ui/sidebar';
 import UserDirectory from '@/components/UserDirectory';
 import PageHeader from './PageHeader';
+import { useUser } from '@/firebase'; // Changed
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const { user, loading } = useUser(); // Changed
 
   useEffect(() => {
-    // In a real app, this would be more robust.
-    // For this mock, we redirect if not logged in.
-    if (localStorage.getItem('isAuthenticated') !== 'true') {
+    if (!loading && !user) {
       router.push('/login');
     }
-  }, [router]);
+  }, [user, loading, router]);
+
+  if (loading) {
+    // You can return a loading spinner here
+    return <div>Loading...</div>;
+  }
+
+  if (!user) {
+    // This will be rendered briefly before the redirect happens
+    return null;
+  }
 
   return (
     <SidebarProvider>
