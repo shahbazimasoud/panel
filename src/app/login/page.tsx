@@ -11,8 +11,8 @@ import { Puzzle } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('admin@example.com');
+  const [password, setPassword] = useState('password');
   const [error, setError] = useState('');
 
   const handleLogin = (e: React.FormEvent) => {
