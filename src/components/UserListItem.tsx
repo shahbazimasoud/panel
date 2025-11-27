@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useSidebar } from '@/components/ui/sidebar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Phone } from 'lucide-react';
+import { Phone, MessageCircle } from 'lucide-react';
 
 type UserListItemProps = {
   user: User;
@@ -34,6 +34,7 @@ export default function UserListItem({ user }: UserListItemProps) {
     toast({
       title: 'Starting Chat...',
       description: `Opening Cisco Jabber chat with ${user.name}.`,
+      icon: <MessageCircle className="animate-spin" />,
     });
     window.location.href = `im:${user.email}`;
   };
@@ -44,6 +45,7 @@ export default function UserListItem({ user }: UserListItemProps) {
       toast({
         title: 'Starting Call...',
         description: `Calling extension ${user.extension} via Cisco Jabber.`,
+        icon: <Phone className="animate-spin" />,
       });
       window.location.href = `tel:${user.extension}`;
     }
