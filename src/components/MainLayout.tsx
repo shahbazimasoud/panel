@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { SidebarProvider, Sidebar, SidebarInset } from '@/components/ui/sidebar';
 import UserDirectory from '@/components/UserDirectory';
+import PageHeader from './PageHeader';
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -23,6 +24,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           <UserDirectory />
         </Sidebar>
         <SidebarInset>
+          <PageHeader />
           {children}
         </SidebarInset>
       </div>

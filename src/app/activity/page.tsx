@@ -10,7 +10,6 @@ import { format, formatDuration, intervalToDuration, startOfDay, isSameDay } fro
 import { DatePicker } from '@/components/ui/datepicker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import MainLayout from '@/components/MainLayout';
-import PageHeader from '@/components/PageHeader';
 import Link from 'next/link';
 
 type DailyLog = {
@@ -134,7 +133,6 @@ export default function ActivityPage() {
 
   return (
     <MainLayout>
-      <PageHeader />
         <div className="container mx-auto max-w-4xl p-4 sm:p-6 lg:p-8">
             <div className="mb-8 flex items-center justify-between">
                 <div>
