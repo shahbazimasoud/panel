@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Puzzle } from 'lucide-react';
-import { useAuth, useFirestore } from '@/firebase';
+import { useAuth, useFirestore, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { logActivity } from '@/lib/activity-log';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { createAdminUser } from '@/firebase/auth/create-user';
@@ -57,22 +57,33 @@ export default function LoginPage() {
         return;
     }
 
-    try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      // The auth state change will be handled by the provider
-      // and the useEffect above will redirect.
-      // We can log the initial login activity here.
-      await logActivity(firestore, userCredential.user.uid, 'LOGIN');
-      router.push('/');
-
-    } catch (err: any) {
-       if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        setError('Incorrect username or password.');
-       } else {
-        setError('An unexpected error occurred. Please try again.');
-        console.error(err);
-       }
-    }
+    signInWithEmailAndPassword(auth, email, password)
+      .then(async (userCredential) => {
+          // On success, log activity and redirect.
+          await logActivity(firestore, userCredential.user.uid, 'LOGIN');
+          router.push('/');
+      })
+      .catch((err: any) => {
+          // Handle standard authentication errors first.
+          if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+              setError('Incorrect username or password.');
+          } else if (err.code === 'auth/permission-denied' || err.name === 'FirebaseError' && err.message.includes('permission-denied')) {
+              // This is likely a security rule violation caught during an operation triggered by login.
+              // We create and emit a contextual error for debugging.
+              const permissionError = new FirestorePermissionError({
+                  path: `login_attempt`, // A simulated path for context
+                  operation: 'get',      // Login can be seen as a 'get' on a user profile
+                  requestResourceData: { email: email }
+              });
+              errorEmitter.emit('permission-error', permissionError);
+              setError('You do not have permission to sign in.');
+          }
+          else {
+              // For other unexpected errors.
+              setError('An unexpected error occurred. Please try again.');
+              console.error(err);
+          }
+      });
   };
 
   return (

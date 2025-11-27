@@ -1,25 +1,37 @@
 'use client';
 
 import { Auth, createUserWithEmailAndPassword } from 'firebase/auth';
+import { FirestorePermissionError } from '../errors';
+import { errorEmitter } from '../error-emitter';
 
 // This is a one-time use function to create the admin user.
-// It will be removed after the user is created.
 export const createAdminUser = async (auth: Auth) => {
-  try {
-    // Check if the user already exists by trying to sign in first.
-    // This is a workaround as there's no direct `fetchUserByEmail` on the client.
-    // We expect this to fail if the user doesn't exist.
-    // A better approach would be a Cloud Function, but for this setup, we'll proceed.
-    console.log('Attempting to create admin user...');
-    await createUserWithEmailAndPassword(auth, 'admin@example.com', 'password');
-    console.log('Admin user created successfully.');
-    return true;
-  } catch (error: any) {
-    if (error.code === 'auth/email-already-in-use') {
-      console.log('Admin user already exists.');
-      return true; // User already exists, so we consider it a success.
+    try {
+        // Attempting to create the user. If it fails with 'auth/email-already-in-use',
+        // we know the user is already set up, which is a success condition for this function.
+        await createUserWithEmailAndPassword(auth, 'admin@example.com', 'password');
+        console.log('Admin user created successfully.');
+        return true;
+    } catch (error: any) {
+        if (error.code === 'auth/email-already-in-use') {
+            console.log('Admin user already exists.');
+            return true; // This is a success condition for our setup logic.
+        }
+
+        // For other errors, particularly permission errors that might manifest here,
+        // we wrap and emit them using our custom error handling architecture.
+        // While a direct permission error on createUser is less common, this pattern
+        // ensures consistent error handling if project setup changes.
+        const permissionError = new FirestorePermissionError({
+            path: `users/admin@example.com`, // Simulated path for context
+            operation: 'create',
+            requestResourceData: { email: 'admin@example.com' },
+        });
+
+        // Use the global emitter to propagate the error for debugging.
+        errorEmitter.emit('permission-error', permissionError);
+
+        console.error('Error creating admin user:', error);
+        return false;
     }
-    console.error('Error creating admin user:', error);
-    return false;
-  }
 };
