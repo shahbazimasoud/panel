@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Notebook, Plus, Trash2, Save, X, FilePen } from 'lucide-react';
+import { Notebook, Plus, Trash2, FilePen } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import {
   AlertDialog,
@@ -177,14 +177,14 @@ export default function Notepad() {
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
-      <SidebarHeader className="p-4 border-b group-data-[collapsible=icon]:hidden">
+      <SidebarHeader className="p-4 border-b">
         <div className="flex items-center gap-2">
           <Notebook className="h-6 w-6" />
           <h2 className="text-xl font-bold font-headline">Notepad</h2>
         </div>
       </SidebarHeader>
 
-      <div className="flex flex-1 min-h-0 group-data-[collapsible=icon]:hidden">
+      <div className="flex flex-1 min-h-0">
         {/* Notes List Pane */}
         <div className={`w-1/3 min-w-0 border-r flex flex-col ${activeView ? 'hidden sm:flex' : 'w-full'}`}>
           <SidebarContent className='p-0'>

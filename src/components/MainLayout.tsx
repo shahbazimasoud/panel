@@ -2,12 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { SidebarProvider, Sidebar, SidebarInset } from '@/components/ui/sidebar';
+import { SidebarProvider, Sidebar, SidebarInset, SidebarHeader, SidebarContent, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
 import UserDirectory from '@/components/UserDirectory';
 import PageHeader from './PageHeader';
 import { useUser } from '@/firebase';
 import { Notebook, Puzzle, Users } from 'lucide-react';
-import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
 import Notepad from './Notepad';
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
@@ -50,27 +49,35 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     <SidebarProvider>
       <div className="flex min-h-screen">
         <Sidebar side="left" collapsible="icon" className="border-r">
-            {activeView === 'users' ? <UserDirectory /> : <Notepad />}
-            <SidebarMenu className="mt-auto p-2">
-                <SidebarMenuItem>
-                    <SidebarMenuButton
-                        onClick={() => setActiveView('users')}
-                        isActive={activeView === 'users'}
-                        tooltip="Members"
-                    >
-                        <Users />
-                    </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                    <SidebarMenuButton
-                        onClick={() => setActiveView('notes')}
-                        isActive={activeView === 'notes'}
-                        tooltip="Notepad"
-                    >
-                        <Notebook />
-                    </SidebarMenuButton>
-                </SidebarMenuItem>
-            </SidebarMenu>
+           <SidebarHeader className="p-2 border-b group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:border-none">
+              <SidebarMenu>
+                  <SidebarMenuItem>
+                      <SidebarMenuButton
+                          onClick={() => setActiveView('users')}
+                          isActive={activeView === 'users'}
+                          tooltip="Members"
+                          className='w-full justify-center'
+                      >
+                          <Users />
+                      </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                      <SidebarMenuButton
+                          onClick={() => setActiveView('notes')}
+                          isActive={activeView === 'notes'}
+                          tooltip="Notepad"
+                           className='w-full justify-center'
+                      >
+                          <Notebook />
+                      </SidebarMenuButton>
+                  </SidebarMenuItem>
+              </SidebarMenu>
+           </SidebarHeader>
+           <SidebarContent className='p-0'>
+              <div className="group-data-[collapsible=icon]:hidden h-full">
+                {activeView === 'users' ? <UserDirectory /> : <Notepad />}
+              </div>
+           </SidebarContent>
         </Sidebar>
         <SidebarInset>
           <PageHeader />

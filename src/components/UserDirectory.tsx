@@ -9,7 +9,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Search, SlidersHorizontal, Users } from 'lucide-react';
 import { SidebarHeader, SidebarContent, SidebarFooter } from '@/components/ui/sidebar';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 
 export default function UserDirectory() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -28,7 +27,7 @@ export default function UserDirectory() {
   
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
-       <SidebarHeader className="p-4 border-b group-data-[collapsible=icon]:hidden">
+       <SidebarHeader className="p-4 border-b">
         <div className="flex items-center gap-2">
           <Users className="h-6 w-6" />
           <h2 className="text-xl font-bold font-headline">Members</h2>
@@ -63,7 +62,7 @@ export default function UserDirectory() {
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="p-0 group-data-[collapsible=icon]:hidden">
+      <SidebarContent className="p-0">
         <ScrollArea className="h-full">
           <div className="space-y-1 p-4 pt-0">
             {filteredUsers.slice(0, visibleCount).map((user) => (
@@ -74,7 +73,7 @@ export default function UserDirectory() {
       </SidebarContent>
 
       {visibleCount < filteredUsers.length && (
-        <SidebarFooter className="p-4 border-t group-data-[collapsible=icon]:hidden">
+        <SidebarFooter className="p-4 border-t">
           <Button
             variant="outline"
             className="w-full"
