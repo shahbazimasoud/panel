@@ -4,7 +4,6 @@ import { useEffect, useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableRow, TableHeader, TableHead } from '@/components/ui/table';
-import { calculateDailyTotal } from '@/lib/activity-log';
 import type { ActivityLogEvent, ActivityLogEventDTO } from '@/lib/types';
 import { LogIn, LogOut, Coffee, Timer, FilterX, ArrowLeft, Monitor, Smartphone, Globe } from 'lucide-react';
 import { format, formatDuration, intervalToDuration, startOfDay, isSameDay } from 'date-fns';
@@ -64,36 +63,29 @@ function DeviceIcon({ device, os }: { device?: string; os?: string }) {
 }
 
 // Helper function to calculate summary totals for a given set of events
-function calculateSummary(events: ActivityLogEvent[]): { totalActiveSeconds: number; totalAwaySeconds: number } {
+function calculateSummary(events: ActivityLogEvent[], forDate?: Date): { totalActiveSeconds: number; totalAwaySeconds: number } {
     let totalActiveSeconds = 0;
     let totalAwaySeconds = 0;
-    let lastActiveTimestamp: number | null = null;
-    let lastAwayTimestamp: number | null = null;
+    let lastEvent: ActivityLogEvent | null = null;
 
     const sortedEvents = [...events].sort((a, b) => a.timestamp - b.timestamp);
 
     for (const event of sortedEvents) {
-        if (event.type === 'ACTIVE' || event.type === 'LOGIN') {
-            if (lastActiveTimestamp === null) {
-                lastActiveTimestamp = event.timestamp;
-            }
-            if (lastAwayTimestamp !== null) {
-                totalAwaySeconds += (event.timestamp - lastAwayTimestamp) / 1000;
-                lastAwayTimestamp = null;
-            }
-        } else if (event.type === 'AWAY' || event.type === 'LOGOUT') {
-            if (lastAwayTimestamp === null) {
-                lastAwayTimestamp = event.timestamp;
-            }
-            if (lastActiveTimestamp !== null) {
-                totalActiveSeconds += (event.timestamp - lastActiveTimestamp) / 1000;
-                lastActiveTimestamp = null;
+        if (lastEvent) {
+            if (lastEvent.type === 'ACTIVE' || lastEvent.type === 'LOGIN') {
+                totalActiveSeconds += (event.timestamp - lastEvent.timestamp) / 1000;
+            } else if (lastEvent.type === 'AWAY') {
+                totalAwaySeconds += (event.timestamp - lastEvent.timestamp) / 1000;
             }
         }
+        lastEvent = event;
     }
+
     // If the user is currently active and we are looking at today's data, add the ongoing duration
-    if (lastActiveTimestamp !== null && (events.length > 0 && isSameDay(new Date(events[0].timestamp), new Date()))) {
-        totalActiveSeconds += (Date.now() - lastActiveTimestamp) / 1000;
+    if (lastEvent && (lastEvent.type === 'ACTIVE' || lastEvent.type === 'LOGIN') && (!forDate || isSameDay(forDate, new Date()))) {
+        totalActiveSeconds += (Date.now() - lastEvent.timestamp) / 1000;
+    } else if (lastEvent && lastEvent.type === 'AWAY' && (!forDate || isSameDay(forDate, new Date()))){
+        totalAwaySeconds += (Date.now() - lastEvent.timestamp) / 1000;
     }
 
     return { totalActiveSeconds, totalAwaySeconds };
@@ -130,49 +122,50 @@ export default function ActivityPage() {
         return !dateFilter || isSameDay(new Date(event.timestamp), startOfDay(dateFilter));
     });
     
-    const overallSummary = calculateSummary(filteredForSummary);
+    const overallSummary = calculateSummary(filteredForSummary, dateFilter);
     
     const filteredForList = filteredForSummary.filter(event => {
         return typeFilter === 'ALL' || event.type === typeFilter;
     });
 
     // --- Grouping for detailed daily logs ---
-    const groupedByDay: Record<string, { events: ActivityLogEvent[], totalActiveSeconds: number }> = {};
-     for (const event of rawLog) { // Use all logs to calculate correct daily totals
+    const groupedByDay: Record<string, { events: ActivityLogEvent[] }> = {};
+     for (const event of filteredForList) {
       const dateKey = format(new Date(event.timestamp), 'eeee, MMMM do, yyyy');
       if (!groupedByDay[dateKey]) {
-        groupedByDay[dateKey] = { events: [], totalActiveSeconds: 0 };
+        groupedByDay[dateKey] = { events: [] };
       }
       groupedByDay[dateKey].events.push(event);
     }
     
-    Object.keys(groupedByDay).forEach(dateKey => {
-        const dailyEvents = groupedByDay[dateKey].events;
-        groupedByDay[dateKey].totalActiveSeconds = calculateDailyTotal(dailyEvents, new Date(dateKey));
-    });
-
-    // --- Final processing for display list ---
-    const displayGroupedByDay: Record<string, { events: ActivityLogEvent[] }> = {};
-     for (const event of filteredForList) {
+    const dailyTotals: Record<string, { totalActiveSeconds: number }> = {};
+    const allGroupedByDay: Record<string, { events: ActivityLogEvent[] }> = {};
+     for (const event of rawLog) {
       const dateKey = format(new Date(event.timestamp), 'eeee, MMMM do, yyyy');
-      if (!displayGroupedByDay[dateKey]) {
-        displayGroupedByDay[dateKey] = { events: [] };
+      if (!allGroupedByDay[dateKey]) {
+        allGroupedByDay[dateKey] = { events: [] };
       }
-      displayGroupedByDay[dateKey].events.push(event);
+      allGroupedByDay[dateKey].events.push(event);
     }
-
-     Object.keys(displayGroupedByDay).forEach(dateKey => {
-        displayGroupedByDay[dateKey].events.sort((a,b) => b.timestamp - a.timestamp);
+    Object.keys(allGroupedByDay).forEach(dateKey => {
+        const dailyEvents = allGroupedByDay[dateKey].events;
+        const { totalActiveSeconds } = calculateSummary(dailyEvents, new Date(dateKey));
+        dailyTotals[dateKey] = { totalActiveSeconds };
     });
 
-    const sortedDays = Object.keys(displayGroupedByDay).sort((a,b) => {
-        return new Date(b).getTime() - new Date(a).getTime()
+     Object.keys(groupedByDay).forEach(dateKey => {
+        groupedByDay[dateKey].events.sort((a,b) => b.timestamp - a.timestamp);
     });
+
+    const sortedDays = Object.keys(groupedByDay).sort((a,b) => {
+        // We parse the date from the key string to sort days chronologically
+        return new Date(a).getTime() - new Date(b).getTime()
+    }).reverse();
 
     const processedLogResult = sortedDays.map(dateKey => ({
       date: dateKey,
-      events: displayGroupedByDay[dateKey].events,
-      totalActiveSeconds: groupedByDay[dateKey]?.totalActiveSeconds || 0
+      events: groupedByDay[dateKey].events,
+      totalActiveSeconds: dailyTotals[dateKey]?.totalActiveSeconds || 0
     }));
 
     return { processedLog: processedLogResult, overallSummary };
@@ -185,7 +178,7 @@ export default function ActivityPage() {
       setTypeFilter('ALL');
   }
 
-  const summaryTitle = dateFilter ? `Summary for ${format(dateFilter, 'MMMM do, yyyy')}` : 'Overall Summary (All Time)';
+  const summaryTitle = dateFilter ? `خلاصه روز ${format(dateFilter, 'MMMM do, yyyy')}` : 'خلاصه کلی (تمام زمان‌ها)';
 
   return (
     <MainLayout>
@@ -198,25 +191,25 @@ export default function ActivityPage() {
                       Back to Home
                     </Link>
                   </Button>
-                  <h1 className="text-3xl font-bold font-headline">Activity Report</h1>
-                  <p className="text-muted-foreground">A detailed log of your session activity.</p>
+                  <h1 className="text-3xl font-bold font-headline">گزارش فعالیت</h1>
+                  <p className="text-muted-foreground">گزارش دقیق فعالیت‌های شما در سیستم.</p>
                 </div>
             </div>
 
             <Card className="mb-8">
                 <CardHeader>
                     <CardTitle>{summaryTitle}</CardTitle>
-                    <CardDescription>Total active and idle time based on the selected filters.</CardDescription>
+                    <CardDescription>مجموع زمان‌های فعال و غیرفعال بر اساس فیلتر انتخاب شده.</CardDescription>
                 </CardHeader>
                 <CardContent>
                      <Table>
                         <TableBody>
                             <TableRow>
-                                <TableCell className="font-medium">Total Active Time</TableCell>
+                                <TableCell className="font-medium">مجموع زمان فعال</TableCell>
                                 <TableCell className="text-right font-bold text-green-600">{formatTotalDuration(overallSummary.totalActiveSeconds)}</TableCell>
                             </TableRow>
                              <TableRow>
-                                <TableCell className="font-medium">Total Away Time</TableCell>
+                                <TableCell className="font-medium">مجموع زمان غیرفعال</TableCell>
                                 <TableCell className="text-right font-bold text-yellow-600">{formatTotalDuration(overallSummary.totalAwaySeconds)}</TableCell>
                             </TableRow>
                         </TableBody>
@@ -227,27 +220,27 @@ export default function ActivityPage() {
 
             <Card className="mb-8">
                 <CardHeader>
-                <CardTitle>Filters</CardTitle>
-                <CardDescription>Refine the activity log by date or event type.</CardDescription>
+                <CardTitle>فیلترها</CardTitle>
+                <CardDescription>گزارش فعالیت را بر اساس تاریخ یا نوع رویداد محدود کنید.</CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-4 sm:flex-row">
                     <DatePicker date={dateFilter} setDate={setDateFilter} />
                     <Select value={typeFilter} onValueChange={setTypeFilter}>
                         <SelectTrigger className="w-full sm:w-[180px]">
-                            <SelectValue placeholder="Filter by type" />
+                            <SelectValue placeholder="فیلتر بر اساس نوع" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="ALL">All Types</SelectItem>
-                            <SelectItem value="LOGIN">Login</SelectItem>
-                            <SelectItem value="LOGOUT">Logout</SelectItem>
-                            <SelectItem value="AWAY">Away</SelectItem>
-                            <SelectItem value="ACTIVE">Active</SelectItem>
+                            <SelectItem value="ALL">همه انواع</SelectItem>
+                            <SelectItem value="LOGIN">ورود</SelectItem>
+                            <SelectItem value="LOGOUT">خروج</SelectItem>
+                            <SelectItem value="AWAY">عدم فعالیت</SelectItem>
+                            <SelectItem value="ACTIVE">فعالیت مجدد</SelectItem>
                         </SelectContent>
                     </Select>
                     {(dateFilter || typeFilter !== 'ALL') && (
                         <Button variant="ghost" onClick={clearFilters}>
                             <FilterX className="mr-2 h-4 w-4" />
-                            Clear Filters
+                            حذف فیلترها
                         </Button>
                     )}
                 </CardContent>
@@ -258,13 +251,13 @@ export default function ActivityPage() {
                 {loading ? (
                     <Card>
                         <CardContent className="p-6 text-center">
-                        <p className="text-muted-foreground">Loading activity...</p>
+                        <p className="text-muted-foreground">در حال بارگذاری فعالیت‌ها...</p>
                         </CardContent>
                     </Card>
                 ) : processedLog.length === 0 ? (
                 <Card>
                     <CardContent className="p-6 text-center">
-                    <p className="text-muted-foreground">No activity matches the current filters.</p>
+                    <p className="text-muted-foreground">هیچ فعالیتی با فیلترهای فعلی مطابقت ندارد.</p>
                     </CardContent>
                 </Card>
                 ) : (
@@ -275,7 +268,7 @@ export default function ActivityPage() {
                             <div className="flex justify-between items-center">
                                 <CardTitle className="text-xl">{dayLog.date}</CardTitle>
                                 <p className="text-sm font-medium text-muted-foreground">
-                                    Daily Active Time: <span className="font-bold text-primary">{formatTotalDuration(dayLog.totalActiveSeconds)}</span>
+                                    زمان فعال روزانه: <span className="font-bold text-primary">{formatTotalDuration(dayLog.totalActiveSeconds)}</span>
                                 </p>
                             </div>
                         </CardHeader>
@@ -286,7 +279,7 @@ export default function ActivityPage() {
                                 let duration = null;
 
                                 if(prevEvent) {
-                                    if (event.type === 'AWAY' && prevEvent.type === 'ACTIVE') {
+                                    if (event.type === 'AWAY' && (prevEvent.type === 'ACTIVE' || prevEvent.type === 'LOGIN')) {
                                         duration = formatEventDuration(prevEvent.timestamp, event.timestamp);
                                     } else if (event.type === 'LOGOUT' && (prevEvent.type === 'ACTIVE' || prevEvent.type === 'LOGIN')) {
                                         duration = formatEventDuration(prevEvent.timestamp, event.timestamp);
