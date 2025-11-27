@@ -21,7 +21,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+} from "@/components/ui/alert-dialog";
+import { FirestorePermissionError } from '@/firebase/errors';
+import { errorEmitter } from '@/firebase/error-emitter';
 
 export default function Notepad() {
   const firestore = useFirestore();
@@ -246,5 +248,3 @@ export default function Notepad() {
     </div>
   );
 }
-
-    
