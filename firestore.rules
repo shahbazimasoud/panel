@@ -19,6 +19,8 @@
  *   from private user data. This allows for simple, secure, and performant rules for read operations.
  * - Prototyping Flexibility: Data shapes are not strictly enforced. Rules focus solely on authorization (who can access what)
  *   and relational integrity (e.g., ensuring a login report's `userId` field matches its parent path).
+ *
+ * Trigger Re-deploy: Force backend configuration update.
  */
 rules_version = '2';
 service cloud.firestore {
