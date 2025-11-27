@@ -81,10 +81,11 @@ function calculateSummary(events: ActivityLogEvent[], forDate?: Date): { totalAc
         lastEvent = event;
     }
 
-    // If the user is currently active and we are looking at today's data, add the ongoing duration
-    if (lastEvent && (lastEvent.type === 'ACTIVE' || lastEvent.type === 'LOGIN') && (!forDate || isSameDay(forDate, new Date()))) {
+    // If the user is currently active and we are looking at today's data (or no date is selected), add the ongoing duration
+    const isTodayOrNoFilter = !forDate || isSameDay(forDate, new Date());
+    if (lastEvent && (lastEvent.type === 'ACTIVE' || lastEvent.type === 'LOGIN') && isTodayOrNoFilter) {
         totalActiveSeconds += (Date.now() - lastEvent.timestamp) / 1000;
-    } else if (lastEvent && lastEvent.type === 'AWAY' && (!forDate || isSameDay(forDate, new Date()))){
+    } else if (lastEvent && lastEvent.type === 'AWAY' && isTodayOrNoFilter){
         totalAwaySeconds += (Date.now() - lastEvent.timestamp) / 1000;
     }
 
@@ -117,20 +118,23 @@ export default function ActivityPage() {
         timestamp: dto.timestamp.toMillis(),
     }));
 
-    // --- Filter logs for both summary and detailed list ---
-    const filteredForSummary = rawLog.filter(event => {
+    // --- Filter logs based on UI filters ---
+    const filteredEvents = rawLog.filter(event => {
+        const dateMatch = !dateFilter || isSameDay(new Date(event.timestamp), startOfDay(dateFilter));
+        const typeMatch = typeFilter === 'ALL' || event.type === typeFilter;
+        return dateMatch && typeMatch;
+    });
+
+    const eventsForSummary = rawLog.filter(event => {
         return !dateFilter || isSameDay(new Date(event.timestamp), startOfDay(dateFilter));
     });
     
-    const overallSummary = calculateSummary(filteredForSummary, dateFilter);
+    // --- Calculate summary for the top table ---
+    const overallSummary = calculateSummary(eventsForSummary, dateFilter);
     
-    const filteredForList = filteredForSummary.filter(event => {
-        return typeFilter === 'ALL' || event.type === typeFilter;
-    });
-
-    // --- Grouping for detailed daily logs ---
+    // --- Group filtered events by day for the detailed list ---
     const groupedByDay: Record<string, { events: ActivityLogEvent[] }> = {};
-     for (const event of filteredForList) {
+     for (const event of filteredEvents) {
       const dateKey = format(new Date(event.timestamp), 'eeee, MMMM do, yyyy');
       if (!groupedByDay[dateKey]) {
         groupedByDay[dateKey] = { events: [] };
@@ -138,18 +142,21 @@ export default function ActivityPage() {
       groupedByDay[dateKey].events.push(event);
     }
     
+    // --- Calculate daily totals for each visible card ---
+    // This should also use the filtered data to be consistent
     const dailyTotals: Record<string, { totalActiveSeconds: number }> = {};
-    const allGroupedByDay: Record<string, { events: ActivityLogEvent[] }> = {};
+    const allEventsGroupedByDay: Record<string, { events: ActivityLogEvent[] }> = {};
      for (const event of rawLog) {
       const dateKey = format(new Date(event.timestamp), 'eeee, MMMM do, yyyy');
-      if (!allGroupedByDay[dateKey]) {
-        allGroupedByDay[dateKey] = { events: [] };
+      if (!allEventsGroupedByDay[dateKey]) {
+        allEventsGroupedByDay[dateKey] = { events: [] };
       }
-      allGroupedByDay[dateKey].events.push(event);
+      allEventsGroupedByDay[dateKey].events.push(event);
     }
-    Object.keys(allGroupedByDay).forEach(dateKey => {
-        const dailyEvents = allGroupedByDay[dateKey].events;
-        const { totalActiveSeconds } = calculateSummary(dailyEvents, new Date(dateKey));
+    Object.keys(allEventsGroupedByDay).forEach(dateKey => {
+        const dailyEvents = allEventsGroupedByDay[dateKey].events;
+        // Pass the actual date of the key to calculateSummary for accurate ongoing session calculation
+        const { totalActiveSeconds } = calculateSummary(dailyEvents, new Date(dateKey.replace(/(\d+)(st|nd|rd|th)/, "$1")));
         dailyTotals[dateKey] = { totalActiveSeconds };
     });
 
@@ -158,8 +165,7 @@ export default function ActivityPage() {
     });
 
     const sortedDays = Object.keys(groupedByDay).sort((a,b) => {
-        // We parse the date from the key string to sort days chronologically
-        return new Date(a).getTime() - new Date(b).getTime()
+        return new Date(a.replace(/(\d+)(st|nd|rd|th)/, "$1")).getTime() - new Date(b.replace(/(\d+)(st|nd|rd|th)/, "$1")).getTime()
     }).reverse();
 
     const processedLogResult = sortedDays.map(dateKey => ({
