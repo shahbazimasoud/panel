@@ -9,6 +9,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Puzzle } from 'lucide-react';
 
+const SESSION_STORAGE_KEY = 'orgconnect-session';
+
+interface SessionData {
+  date: string;
+  totalSeconds: number;
+  sessionStartTime: number | null;
+}
+
+const getToday = () => new Date().toISOString().split('T')[0];
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('admin@example.com');
@@ -26,7 +36,26 @@ export default function LoginPage() {
     e.preventDefault();
     if (email === 'admin@example.com' && password === 'password') {
       localStorage.setItem('isAuthenticated', 'true');
-      localStorage.setItem('sessionStartTime', Date.now().toString());
+      
+      const today = getToday();
+      const sessionDataString = localStorage.getItem(SESSION_STORAGE_KEY);
+      let data: SessionData;
+
+      if (sessionDataString) {
+        data = JSON.parse(sessionDataString);
+        // If the stored date is not today, reset the timer for the new day.
+        if(data.date !== today) {
+            data = { date: today, totalSeconds: 0, sessionStartTime: Date.now() };
+        } else {
+            // It is today, just start a new session timestamp
+            data.sessionStartTime = Date.now();
+        }
+      } else {
+        // No session data found, start a new one for today.
+        data = { date: today, totalSeconds: 0, sessionStartTime: Date.now() };
+      }
+      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(data));
+
       router.push('/');
     } else {
       setError('Incorrect username or password.');

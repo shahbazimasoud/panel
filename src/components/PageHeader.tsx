@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   SidebarTrigger
@@ -30,6 +30,15 @@ import { cn } from '@/lib/utils';
 import type { UserStatus } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 
+const SESSION_STORAGE_KEY = 'orgconnect-session';
+
+interface SessionData {
+  date: string;
+  totalSeconds: number;
+  sessionStartTime: number | null;
+}
+
+const getToday = () => new Date().toISOString().split('T')[0];
 
 // This is a mock. In a real app, you'd get this from a session/context.
 const useAuth = () => {
@@ -42,7 +51,23 @@ const useAuth = () => {
 
   const logout = () => {
     localStorage.removeItem('isAuthenticated');
-    localStorage.removeItem('sessionStartTime');
+    
+    // On logout, update the total time for the day
+    const sessionDataString = localStorage.getItem(SESSION_STORAGE_KEY);
+    if (sessionDataString) {
+      try {
+        const data: SessionData = JSON.parse(sessionDataString);
+        if (data.sessionStartTime) {
+          const sessionDuration = Math.floor((Date.now() - data.sessionStartTime) / 1000);
+          data.totalSeconds += sessionDuration;
+          data.sessionStartTime = null; // Mark session as ended
+          localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(data));
+        }
+      } catch (error) {
+        console.error("Failed to parse session data on logout:", error);
+      }
+    }
+    
     setIsAuthenticated(false);
   }
 
@@ -63,8 +88,7 @@ function formatDuration(seconds: number) {
   const s = Math.floor(seconds % 60);
   return [h, m, s]
     .map((v) => (v < 10 ? '0' + v : v))
-    .filter((v, i) => v !== '00' || i > 0)
-    .join(':') || '0:00';
+    .join(':')
 }
 
 const statusClasses: Record<UserStatus, string> = {
@@ -78,25 +102,76 @@ export default function PageHeader() {
   const { open, toggleSidebar } = useSidebar();
   const [sessionDuration, setSessionDuration] = useState(0);
   const router = useRouter();
+  
+  const saveCurrentSession = useCallback(() => {
+     if (isAuthenticated) {
+        const sessionDataString = localStorage.getItem(SESSION_STORAGE_KEY);
+        if (sessionDataString) {
+          try {
+            const data: SessionData = JSON.parse(sessionDataString);
+            if (data.sessionStartTime) {
+              const currentSessionDuration = Math.floor((Date.now() - data.sessionStartTime) / 1000);
+              const updatedData: SessionData = {
+                ...data,
+                totalSeconds: data.totalSeconds + currentSessionDuration,
+                sessionStartTime: Date.now(), // Reset start time for the next calculation
+              };
+              localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(updatedData));
+            }
+          } catch (error) {
+            console.error("Failed to update session data:", error);
+          }
+        }
+      }
+  }, [isAuthenticated]);
+
 
   useEffect(() => {
     let timer: NodeJS.Timeout | undefined;
     if (isAuthenticated) {
-      const sessionStartTime = localStorage.getItem('sessionStartTime');
-      if (sessionStartTime) {
-         timer = setInterval(() => {
-            const now = Date.now();
-            const start = parseInt(sessionStartTime, 10);
-            setSessionDuration(Math.floor((now - start) / 1000));
-        }, 1000);
+      const today = getToday();
+      let data: SessionData;
+      const sessionDataString = localStorage.getItem(SESSION_STORAGE_KEY);
+
+      if (sessionDataString) {
+          data = JSON.parse(sessionDataString);
+          // If the stored date is not today, reset the timer for the new day.
+          if(data.date !== today) {
+              data = { date: today, totalSeconds: 0, sessionStartTime: Date.now() };
+          } else if (!data.sessionStartTime) {
+            // If it is today but no active session, start one.
+             data.sessionStartTime = Date.now();
+          }
+      } else {
+          // No session data found, start a new one for today.
+          data = { date: today, totalSeconds: 0, sessionStartTime: Date.now() };
       }
+      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(data));
+      
+
+      timer = setInterval(() => {
+        const sessionDataString = localStorage.getItem(SESSION_STORAGE_KEY);
+        if(sessionDataString) {
+            const currentData: SessionData = JSON.parse(sessionDataString);
+            const activeSessionDuration = currentData.sessionStartTime 
+                ? Math.floor((Date.now() - currentData.sessionStartTime) / 1000)
+                : 0;
+            setSessionDuration(currentData.totalSeconds + activeSessionDuration);
+        }
+      }, 1000);
+
+      // Save session on page unload
+      window.addEventListener('beforeunload', saveCurrentSession);
     }
+    
     return () => {
         if(timer) clearInterval(timer);
+        window.removeEventListener('beforeunload', saveCurrentSession);
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, saveCurrentSession]);
 
   const handleLogout = () => {
+    saveCurrentSession(); // Save the final duration before logging out
     logout();
     router.push('/login');
   }
