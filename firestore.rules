@@ -105,7 +105,8 @@ service cloud.firestore {
        * @principle Enforces strict data ownership for personal content.
        */
       match /notes/{noteId} {
-        allow read, write: if isOwner(userId) && request.auth.uid == request.resource.data.userId;
+        allow read: if isOwner(userId);
+        allow write: if isOwner(userId) && request.resource.data.userId == userId;
       }
     }
 
