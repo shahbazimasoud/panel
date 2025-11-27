@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
 import type { Note, NoteDTO } from '@/lib/types';
-import { collection, query, orderBy, serverTimestamp, addDoc, doc, updateDoc, deleteDoc, where } from 'firebase/firestore';
+import { collection, query, orderBy, serverTimestamp, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { SidebarHeader, SidebarContent, SidebarFooter } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -89,15 +89,32 @@ export default function Notepad() {
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
         };
-        const newDocRef = await addDoc(collection(firestore, 'users', user.uid, 'notes'), noteData);
+        const notesCollection = collection(firestore, 'users', user.uid, 'notes');
+        addDoc(notesCollection, noteData).catch(error => {
+          const permissionError = new FirestorePermissionError({
+            path: notesCollection.path,
+            operation: 'create',
+            requestResourceData: noteData,
+          });
+          errorEmitter.emit('permission-error', permissionError);
+        });
+
         // After creation, exit creating mode. The new note will appear in the list.
         handleCancel();
     } else if (selectedNote) {
         const noteRef = doc(firestore, 'users', user.uid, 'notes', selectedNote.id);
-        await updateDoc(noteRef, {
+        const updatedData = {
             title: title.trim(),
             content,
             updatedAt: serverTimestamp(),
+        };
+        updateDoc(noteRef, updatedData).catch(error => {
+          const permissionError = new FirestorePermissionError({
+            path: noteRef.path,
+            operation: 'update',
+            requestResourceData: updatedData,
+          });
+          errorEmitter.emit('permission-error', permissionError);
         });
         // We don't need to do anything else, the real-time listener will update the UI.
     }
@@ -107,7 +124,13 @@ export default function Notepad() {
   const handleDelete = async (noteId: string) => {
     if (!firestore || !user) return;
     const noteRef = doc(firestore, 'users', user.uid, 'notes', noteId);
-    await deleteDoc(noteRef);
+    deleteDoc(noteRef).catch(error => {
+        const permissionError = new FirestorePermissionError({
+            path: noteRef.path,
+            operation: 'delete',
+        });
+        errorEmitter.emit('permission-error', permissionError);
+    });
     // After deletion, reset the view
     handleCancel();
   };
@@ -127,13 +150,13 @@ export default function Notepad() {
       <SidebarHeader className="p-4 border-b">
         <div className="flex items-center gap-2">
           <Notebook className="h-6 w-6" />
-          <h2 className="text-xl font-bold font-headline">Notepad</h2>
+          <h2 className="text-xl font-bold font-headline group-data-[collapsible=icon]:hidden">Notepad</h2>
         </div>
       </SidebarHeader>
 
-      <div className="flex flex-1 min-h-0">
+      <div className="flex flex-1 min-h-0 group-data-[collapsible=icon]:hidden">
         {/* Notes List Pane */}
-        <div className={`w-1/3 border-r flex flex-col group-data-[collapsible=icon]:hidden ${activeView ? 'hidden md:block' : 'w-full'}`}>
+        <div className={`w-1/3 border-r flex flex-col ${activeView ? 'hidden sm:flex' : 'w-full'}`}>
           <SidebarContent className='p-0'>
             <ScrollArea className="h-full">
               {isLoading && <p className="p-4 text-sm text-muted-foreground">Loading notes...</p>}
@@ -154,7 +177,7 @@ export default function Notepad() {
               ))}
             </ScrollArea>
           </SidebarContent>
-          <SidebarFooter className="p-2 border-t group-data-[collapsible=icon]:hidden">
+          <SidebarFooter className="p-2 border-t">
             <Button onClick={handleNewNoteClick} className="w-full">
               <Plus className="mr-2 h-4 w-4" /> New Note
             </Button>
@@ -162,7 +185,7 @@ export default function Notepad() {
         </div>
 
         {/* Editor Pane */}
-        <div className={`flex-1 group-data-[collapsible=icon]:hidden ${activeView ? 'flex' : 'hidden md:flex'}`}>
+        <div className={`flex-1 ${activeView ? 'flex' : 'hidden sm:flex'}`}>
           {activeView ? (
             <div className="flex flex-col h-full w-full">
               <div className="p-2 border-b flex items-center gap-2 justify-between">

@@ -28,7 +28,7 @@ export default function UserDirectory() {
   
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
-       <SidebarHeader className="p-4 group-data-[collapsible=icon]:p-2">
+       <SidebarHeader className="p-4 border-b">
         <div className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
           <TooltipProvider>
             <Tooltip>
