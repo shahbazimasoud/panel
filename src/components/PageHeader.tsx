@@ -25,7 +25,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { users } from '@/lib/data';
 import { cn } from '@/lib/utils';
-import type { UserStatus, ActivityLogEvent } from '@/lib/types';
+import type { UserStatus } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 import { logActivity, getTodayTotalDuration } from '@/lib/activity-log';
 
@@ -72,7 +72,7 @@ const statusClasses: Record<UserStatus, string> = {
 
 export default function PageHeader() {
   const { isAuthenticated, isAdmin, user, logout } = useAuth();
-  const { open, toggleSidebar } = useSidebar();
+  const { toggleSidebar } = useSidebar();
   const [sessionDuration, setSessionDuration] = useState(0);
   const router = useRouter();
   
@@ -127,7 +127,7 @@ export default function PageHeader() {
                 </Link>
               </Button>
             )}
-            <Link href="/activity" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <Link href="/activity" className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground">
               <Clock className="h-4 w-4" />
               <span>{formatDuration(sessionDuration)}</span>
             </Link>
