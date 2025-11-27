@@ -28,21 +28,12 @@ export default function UserDirectory() {
   
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
-       <SidebarHeader className="p-4 border-b">
-        <div className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className='p-1'>
-                  <Users className="h-6 w-6" />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="right">Organization Members</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          <h2 className="text-xl font-bold font-headline group-data-[collapsible=icon]:hidden">Members</h2>
+       <SidebarHeader className="p-4 border-b group-data-[collapsible=icon]:hidden">
+        <div className="flex items-center gap-2">
+          <Users className="h-6 w-6" />
+          <h2 className="text-xl font-bold font-headline">Members</h2>
         </div>
-        <div className="relative mt-4 group-data-[collapsible=icon]:hidden">
+        <div className="relative mt-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search..."
@@ -51,7 +42,7 @@ export default function UserDirectory() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="mt-4 flex items-center gap-2 group-data-[collapsible=icon]:hidden">
+        <div className="mt-4 flex items-center gap-2">
             <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
             <Select
               value={departmentFilter}

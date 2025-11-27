@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Notebook, Plus, Trash2, Save, X } from 'lucide-react';
+import { Notebook, Plus, Trash2, Save, X, FilePen } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import {
   AlertDialog,
@@ -24,6 +24,21 @@ import {
 } from "@/components/ui/alert-dialog";
 import { FirestorePermissionError } from '@/firebase/errors';
 import { errorEmitter } from '@/firebase/error-emitter';
+
+// Debounce hook for auto-saving
+const useDebounce = (value: any, delay: number) => {
+    const [debouncedValue, setDebouncedValue] = useState(value);
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedValue(value);
+        }, delay);
+        return () => {
+            clearTimeout(handler);
+        };
+    }, [value, delay]);
+    return debouncedValue;
+};
+
 
 export default function Notepad() {
   const firestore = useFirestore();
@@ -54,71 +69,67 @@ export default function Notepad() {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
 
+  const debouncedTitle = useDebounce(title, 1500);
+  const debouncedContent = useDebounce(content, 1500);
+
+  // Auto-save logic
+  useEffect(() => {
+    if (!firestore || !user || isCreating) return;
+
+    if (selectedNote && (debouncedTitle !== selectedNote.title || debouncedContent !== selectedNote.content)) {
+      if (!debouncedTitle.trim()) return; // Don't save if title is empty
+      
+      const noteRef = doc(firestore, 'users', user.uid, 'notes', selectedNote.id);
+      const updatedData = {
+          title: debouncedTitle.trim(),
+          content: debouncedContent,
+          updatedAt: serverTimestamp(),
+      };
+      updateDoc(noteRef, updatedData).catch(error => {
+        const permissionError = new FirestorePermissionError({
+          path: noteRef.path,
+          operation: 'update',
+          requestResourceData: updatedData,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      });
+    }
+  }, [debouncedTitle, debouncedContent, selectedNote, firestore, user, isCreating]);
+
   // When a new note is selected from the list, update the editor
   const handleSelectNote = useCallback((note: Note) => {
-    // If we're in the middle of creating a new note, don't switch
-    if (isCreating) return;
+    setIsCreating(false);
     setSelectedNote(note);
     setTitle(note.title);
     setContent(note.content);
-  }, [isCreating]);
-
-  // Set up a new note for creation
-  const handleNewNoteClick = () => {
-    setIsCreating(true);
-    setSelectedNote(null);
-    setTitle('');
-    setContent('');
-  };
+  }, []);
   
-  // Cancel creation or edit
-  const handleCancel = () => {
-      setIsCreating(false);
-      setSelectedNote(null);
-      setTitle('');
-      setContent('');
-  }
-
-  // Save or create a note
-  const handleSave = async () => {
-    if (!firestore || !user || !title.trim()) return;
-
-    if (isCreating) {
-        const noteData = {
-            userId: user.uid,
-            title: title.trim(),
-            content,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-        };
-        const notesCollection = collection(firestore, 'users', user.uid, 'notes');
-        addDoc(notesCollection, noteData).catch(error => {
-          const permissionError = new FirestorePermissionError({
-            path: notesCollection.path,
-            operation: 'create',
-            requestResourceData: noteData,
-          });
-          errorEmitter.emit('permission-error', permissionError);
+  // Create a new note and select it
+  const handleNewNoteClick = async () => {
+    if (!firestore || !user) return;
+    
+    setIsCreating(true); // Go into creating mode
+    const noteData = {
+        userId: user.uid,
+        title: "Untitled Note",
+        content: "",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+    };
+    const notesCollection = collection(firestore, 'users', user.uid, 'notes');
+    try {
+        const docRef = await addDoc(notesCollection, noteData);
+        // We don't need to manually select it. The real-time listener will add it to the list
+        // and the useEffect below will select the newest one.
+    } catch(error) {
+        const permissionError = new FirestorePermissionError({
+          path: notesCollection.path,
+          operation: 'create',
+          requestResourceData: noteData,
         });
-
-        // After creation, exit creating mode. The new note will appear in the list.
-        handleCancel();
-    } else if (selectedNote) {
-        const noteRef = doc(firestore, 'users', user.uid, 'notes', selectedNote.id);
-        const updatedData = {
-            title: title.trim(),
-            content,
-            updatedAt: serverTimestamp(),
-        };
-        updateDoc(noteRef, updatedData).catch(error => {
-          const permissionError = new FirestorePermissionError({
-            path: noteRef.path,
-            operation: 'update',
-            requestResourceData: updatedData,
-          });
-          errorEmitter.emit('permission-error', permissionError);
-        });
-        // We don't need to do anything else, the real-time listener will update the UI.
+        errorEmitter.emit('permission-error', permissionError);
+    } finally {
+        setIsCreating(false);
     }
   };
 
@@ -126,6 +137,21 @@ export default function Notepad() {
   const handleDelete = async (noteId: string) => {
     if (!firestore || !user) return;
     const noteRef = doc(firestore, 'users', user.uid, 'notes', noteId);
+    
+    // Optimistically select the next note
+    if (selectedNote?.id === noteId && notes) {
+        const currentIndex = notes.findIndex(n => n.id === noteId);
+        if (currentIndex > 0) {
+            handleSelectNote(notes[currentIndex - 1]);
+        } else if (notes.length > 1) {
+            handleSelectNote(notes[1]);
+        } else {
+            setSelectedNote(null);
+            setTitle('');
+            setContent('');
+        }
+    }
+
     deleteDoc(noteRef).catch(error => {
         const permissionError = new FirestorePermissionError({
             path: noteRef.path,
@@ -133,26 +159,28 @@ export default function Notepad() {
         });
         errorEmitter.emit('permission-error', permissionError);
     });
-    // After deletion, reset the view
-    handleCancel();
   };
   
   // Determine if the editor pane should be visible
   const activeView = selectedNote || isCreating;
 
-  // Set the first note as selected on initial load if none is selected
+  // Set the first note as selected on initial load or when notes change
   useEffect(() => {
-    if(!selectedNote && !isCreating && notes && notes.length > 0) {
+    if(!selectedNote && notes && notes.length > 0) {
         handleSelectNote(notes[0]);
     }
-  }, [notes, selectedNote, isCreating, handleSelectNote]);
+    // If the selected note is deleted from another client
+    if(selectedNote && notes && !notes.some(n => n.id === selectedNote.id)) {
+      setSelectedNote(notes[0] || null);
+    }
+  }, [notes, selectedNote, handleSelectNote]);
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
-      <SidebarHeader className="p-4 border-b">
+      <SidebarHeader className="p-4 border-b group-data-[collapsible=icon]:hidden">
         <div className="flex items-center gap-2">
           <Notebook className="h-6 w-6" />
-          <h2 className="text-xl font-bold font-headline group-data-[collapsible=icon]:hidden">Notepad</h2>
+          <h2 className="text-xl font-bold font-headline">Notepad</h2>
         </div>
       </SidebarHeader>
 
@@ -180,7 +208,7 @@ export default function Notepad() {
             </ScrollArea>
           </SidebarContent>
           <SidebarFooter className="p-2 border-t">
-            <Button onClick={handleNewNoteClick} className="w-full">
+            <Button onClick={handleNewNoteClick} className="w-full" disabled={isCreating}>
               <Plus className="mr-2 h-4 w-4" /> New Note
             </Button>
           </SidebarFooter>
@@ -196,6 +224,7 @@ export default function Notepad() {
                   onChange={(e) => setTitle(e.target.value)}
                   className="text-lg font-bold border-none focus-visible:ring-0 shadow-none flex-1"
                   placeholder="Note Title"
+                  disabled={isCreating}
                 />
                  {selectedNote && (
                   <AlertDialog>
@@ -225,21 +254,14 @@ export default function Notepad() {
                   onChange={(e) => setContent(e.target.value)}
                   className="h-full w-full border-none resize-none focus-visible:ring-0 shadow-none text-base p-4"
                   placeholder="Start writing..."
+                  disabled={isCreating}
                 />
               </ScrollArea>
-              <div className="p-2 border-t flex justify-end gap-2">
-                <Button variant="ghost" onClick={handleCancel}>
-                  <X className="mr-2 h-4 w-4" /> Cancel
-                </Button>
-                <Button onClick={handleSave} disabled={!title.trim()}>
-                  <Save className="mr-2 h-4 w-4" /> Save
-                </Button>
-              </div>
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-center p-4">
-              <Notebook className="h-16 w-16 text-muted-foreground/50" />
-              <h3 className="mt-4 text-lg font-semibold">Select a note or create a new one</h3>
+              <FilePen className="h-16 w-16 text-muted-foreground/50" />
+              <h3 className="mt-4 text-lg font-semibold">Select a note or create one</h3>
               <p className="text-sm text-muted-foreground">Your personal space for thoughts and ideas.</p>
             </div>
           )}
