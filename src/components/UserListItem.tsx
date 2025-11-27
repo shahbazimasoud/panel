@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useSidebar } from '@/components/ui/sidebar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Phone, MessageCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 type UserListItemProps = {
   user: User;
