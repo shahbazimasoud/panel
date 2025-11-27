@@ -79,9 +79,6 @@ export const logActivity = (firestore: Firestore, userId: string, type: Activity
 
       // Emit the error globally
       errorEmitter.emit('permission-error', permissionError);
-
-      // Log to console for fallback debugging, but emitter is primary
-      console.error("Error logging activity to Firestore:", error);
       
       // Reset last event type if logging fails to allow retry
       lastEventType = null;
