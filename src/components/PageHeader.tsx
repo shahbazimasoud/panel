@@ -12,6 +12,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Clock,
+  Settings,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useSidebar } from '@/components/ui/sidebar';
@@ -25,6 +26,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { users } from '@/lib/data';
+import { cn } from '@/lib/utils';
+import type { UserStatus } from '@/lib/types';
 
 // This is a mock. In a real app, you'd get this from a session/context.
 const useAuth = () => {
@@ -49,6 +52,11 @@ function formatDuration(seconds: number) {
     .join(':');
 }
 
+const statusClasses: Record<UserStatus, string> = {
+  online: 'bg-green-500',
+  idle: 'bg-yellow-400',
+  offline: 'bg-red-500',
+};
 
 export default function PageHeader() {
   const { isAuthenticated, isAdmin, user } = useAuth();
@@ -94,6 +102,12 @@ export default function PageHeader() {
                     <AvatarImage src={user.avatarUrl} alt={user.name} />
                     <AvatarFallback>{user.name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
                   </Avatar>
+                   <span
+                    className={cn(
+                      'absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full border-2 border-background',
+                      statusClasses[user.status]
+                    )}
+                  />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56" align="end" forceMount>
@@ -106,6 +120,12 @@ export default function PageHeader() {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
+                 <DropdownMenuItem asChild>
+                   <Link href="/profile">
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Profile</span>
+                  </Link>
+                </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                    <Link href="/login">
                     <LogOut className="mr-2 h-4 w-4" />
