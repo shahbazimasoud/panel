@@ -8,19 +8,35 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Puzzle } from 'lucide-react';
-import { useAuth, useFirestore } from '@/firebase'; // Changed
-import { logActivity } from '@/lib/activity-log'; // Changed
-import { signInWithEmailAndPassword } from 'firebase/auth'; // Changed
+import { useAuth, useFirestore } from '@/firebase';
+import { logActivity } from '@/lib/activity-log';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { createAdminUser } from '@/firebase/auth/create-user';
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('admin@example.com');
   const [password, setPassword] = useState('password');
   const [error, setError] = useState('');
+  const [isSetup, setIsSetup] = useState(false);
   
   const auth = useAuth();
   const firestore = useFirestore();
-  const { user } = useAuth(); // Changed
+  const { user } = useAuth();
+
+  useEffect(() => {
+    const setupAdmin = async () => {
+        if (auth && !isSetup) {
+            const success = await createAdminUser(auth);
+            if (success) {
+                setIsSetup(true);
+            } else {
+                setError("Failed to complete initial user setup. Please refresh.");
+            }
+        }
+    };
+    setupAdmin();
+  }, [auth, isSetup]);
 
   // Redirect if already logged in
   useEffect(() => {
@@ -29,12 +45,16 @@ export default function LoginPage() {
     }
   }, [user, router]);
 
-  const handleLogin = async (e: React.FormEvent) => { // Changed
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     if (!auth || !firestore) {
       setError("Authentication service is not available.");
       return;
+    }
+    if (!isSetup) {
+        setError("Setup is not complete. Please wait a moment and try again.");
+        return;
     }
 
     try {
@@ -97,7 +117,7 @@ export default function LoginPage() {
               />
             </div>
             {error && <p className="text-sm font-medium text-destructive">{error}</p>}
-            <Button type="submit" className="w-full !mt-6">
+            <Button type="submit" className="w-full !mt-6" disabled={!isSetup}>
               Login
             </Button>
           </form>
