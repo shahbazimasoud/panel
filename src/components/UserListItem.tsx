@@ -34,7 +34,6 @@ export default function UserListItem({ user }: UserListItemProps) {
     toast({
       title: 'Starting Chat...',
       description: `Opening Cisco Jabber chat with ${user.name}.`,
-      icon: <MessageCircle className="animate-spin" />,
     });
     window.location.href = `im:${user.email}`;
   };
@@ -45,7 +44,6 @@ export default function UserListItem({ user }: UserListItemProps) {
       toast({
         title: 'Starting Call...',
         description: `Calling extension ${user.extension} via Cisco Jabber.`,
-        icon: <Phone className="animate-spin" />,
       });
       window.location.href = `tel:${user.extension}`;
     }
@@ -110,6 +108,10 @@ export default function UserListItem({ user }: UserListItemProps) {
         </div>
       </div>
       {user.bio && <p className="text-sm text-foreground">{user.bio}</p>}
+      <Button onClick={handleDoubleClick}>
+        <MessageCircle className="mr-2 h-4 w-4" />
+        Start Chat
+      </Button>
     </div>
   );
 
@@ -122,7 +124,10 @@ export default function UserListItem({ user }: UserListItemProps) {
           </TooltipTrigger>
           <TooltipContent side="right">
             <p className="font-semibold">{user.name}</p>
-            <p className="text-sm text-muted-foreground">{user.department}</p>
+            <p className="text-sm text-muted-foreground">{statusText[user.status]}</p>
+             {user.bio && (
+              <p className="text-xs text-muted-foreground/80">{user.bio}</p>
+            )}
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>

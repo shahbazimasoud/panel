@@ -3,13 +3,13 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
 import type { Note, NoteDTO } from '@/lib/types';
-import { collection, query, orderBy, serverTimestamp, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, orderBy, serverTimestamp, addDoc, doc, updateDoc, deleteDoc, where } from 'firebase/firestore';
 import { SidebarHeader, SidebarContent, SidebarFooter } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Notebook, Plus, Trash2, Edit, Save, X, AlertTriangle } from 'lucide-react';
+import { Notebook, Plus, Trash2, Save, X } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import {
   AlertDialog,
@@ -42,8 +42,8 @@ export default function Notepad() {
     return notesDTO.map(n => ({
       ...n,
       id: n.id,
-      createdAt: n.createdAt.toMillis(),
-      updatedAt: n.updatedAt.toMillis(),
+      createdAt: n.createdAt?.toMillis(),
+      updatedAt: n.updatedAt?.toMillis(),
     }));
   }, [notesDTO]);
 
@@ -52,60 +52,79 @@ export default function Notepad() {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
 
+  // When a new note is selected from the list, update the editor
   const handleSelectNote = useCallback((note: Note) => {
+    // If we're in the middle of creating a new note, don't switch
+    if (isCreating) return;
     setSelectedNote(note);
     setTitle(note.title);
     setContent(note.content);
-    setIsCreating(false);
-  }, []);
+  }, [isCreating]);
 
-  const handleNewNote = () => {
+  // Set up a new note for creation
+  const handleNewNoteClick = () => {
     setIsCreating(true);
     setSelectedNote(null);
-    setTitle('New Note');
+    setTitle('');
     setContent('');
   };
-
-  const handleSave = async () => {
-    if (!firestore || !user) return;
-    
-    if (isCreating) {
-      const noteData = {
-        userId: user.uid,
-        title,
-        content,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      };
-      const newDocRef = await addDoc(collection(firestore, 'users', user.uid, 'notes'), noteData);
+  
+  // Cancel creation or edit
+  const handleCancel = () => {
       setIsCreating(false);
-      // We can't immediately select the note as we don't have the final object with timestamps
+      setSelectedNote(null);
+      setTitle('');
+      setContent('');
+  }
+
+  // Save or create a note
+  const handleSave = async () => {
+    if (!firestore || !user || !title.trim()) return;
+
+    if (isCreating) {
+        const noteData = {
+            userId: user.uid,
+            title: title.trim(),
+            content,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+        };
+        const newDocRef = await addDoc(collection(firestore, 'users', user.uid, 'notes'), noteData);
+        // After creation, exit creating mode. The new note will appear in the list.
+        handleCancel();
     } else if (selectedNote) {
-      const noteRef = doc(firestore, 'users', user.uid, 'notes', selectedNote.id);
-      await updateDoc(noteRef, {
-        title,
-        content,
-        updatedAt: serverTimestamp(),
-      });
+        const noteRef = doc(firestore, 'users', user.uid, 'notes', selectedNote.id);
+        await updateDoc(noteRef, {
+            title: title.trim(),
+            content,
+            updatedAt: serverTimestamp(),
+        });
+        // We don't need to do anything else, the real-time listener will update the UI.
     }
   };
 
+  // Delete a note
   const handleDelete = async (noteId: string) => {
     if (!firestore || !user) return;
     const noteRef = doc(firestore, 'users', user.uid, 'notes', noteId);
     await deleteDoc(noteRef);
-    if (selectedNote?.id === noteId) {
-        setSelectedNote(null);
-        setTitle('');
-        setContent('');
-    }
+    // After deletion, reset the view
+    handleCancel();
   };
-
+  
+  // Determine if the editor pane should be visible
   const activeView = selectedNote || isCreating;
+
+  // Set the first note as selected on initial load if none is selected
+  useEffect(() => {
+    if(!selectedNote && !isCreating && notes && notes.length > 0) {
+        handleSelectNote(notes[0]);
+    }
+  }, [notes, selectedNote, isCreating, handleSelectNote]);
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
-      <SidebarHeader className="p-4">
+      <SidebarHeader className="p-4 border-b">
         <div className="flex items-center gap-2">
           <Notebook className="h-6 w-6" />
           <h2 className="text-xl font-bold font-headline">Notepad</h2>
@@ -113,63 +132,50 @@ export default function Notepad() {
       </SidebarHeader>
 
       <div className="flex flex-1 min-h-0">
-        {/* Notes List */}
-        <div className={`w-1/3 border-r group-data-[collapsible=icon]:hidden ${activeView ? 'hidden md:block' : ''}`}>
-          <SidebarContent>
+        {/* Notes List Pane */}
+        <div className={`w-1/3 border-r flex flex-col group-data-[collapsible=icon]:hidden ${activeView ? 'hidden md:block' : 'w-full'}`}>
+          <SidebarContent className='p-0'>
             <ScrollArea className="h-full">
               {isLoading && <p className="p-4 text-sm text-muted-foreground">Loading notes...</p>}
+              {!isLoading && notes?.length === 0 && (
+                <div className='p-4 text-center text-sm text-muted-foreground'>No notes yet. Create one!</div>
+              )}
               {notes?.map(note => (
                 <button
                   key={note.id}
                   onClick={() => handleSelectNote(note)}
-                  className={`block w-full text-left p-3 border-b hover:bg-sidebar-accent ${selectedNote?.id === note.id ? 'bg-sidebar-accent' : ''}`}
+                  className={`block w-full text-left p-3 border-b hover:bg-sidebar-accent transition-colors ${selectedNote?.id === note.id ? 'bg-sidebar-accent' : ''}`}
                 >
-                  <h3 className="font-semibold truncate">{note.title}</h3>
+                  <h3 className="font-semibold truncate">{note.title || "Untitled Note"}</h3>
                   <p className="text-xs text-muted-foreground truncate">
-                    {formatDistanceToNow(note.updatedAt, { addSuffix: true })}
+                    {note.updatedAt ? formatDistanceToNow(note.updatedAt, { addSuffix: true }) : '...'}
                   </p>
                 </button>
               ))}
             </ScrollArea>
           </SidebarContent>
           <SidebarFooter className="p-2 border-t group-data-[collapsible=icon]:hidden">
-            <Button onClick={handleNewNote} className="w-full">
+            <Button onClick={handleNewNoteClick} className="w-full">
               <Plus className="mr-2 h-4 w-4" /> New Note
             </Button>
           </SidebarFooter>
         </div>
 
-        {/* Editor / Welcome View */}
-        <div className={`flex-1 group-data-[collapsible=icon]:hidden ${activeView ? '' : 'hidden md:flex'}`}>
+        {/* Editor Pane */}
+        <div className={`flex-1 group-data-[collapsible=icon]:hidden ${activeView ? 'flex' : 'hidden md:flex'}`}>
           {activeView ? (
             <div className="flex flex-col h-full w-full">
-              <div className="p-2 border-b flex items-center gap-2">
+              <div className="p-2 border-b flex items-center gap-2 justify-between">
                 <Input
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="text-lg font-bold border-none focus-visible:ring-0 shadow-none"
+                  className="text-lg font-bold border-none focus-visible:ring-0 shadow-none flex-1"
                   placeholder="Note Title"
                 />
-              </div>
-              <ScrollArea className="flex-1">
-                <Textarea
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  className="h-full w-full border-none resize-none focus-visible:ring-0 shadow-none text-base"
-                  placeholder="Start writing..."
-                />
-              </ScrollArea>
-              <div className="p-2 border-t flex justify-end gap-2">
-                <Button variant="ghost" onClick={() => { setIsCreating(false); setSelectedNote(null); }}>
-                  <X className="mr-2 h-4 w-4" /> Cancel
-                </Button>
-                <Button onClick={handleSave}>
-                  <Save className="mr-2 h-4 w-4" /> Save
-                </Button>
                  {selectedNote && (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button variant="destructive" size="icon">
+                      <Button variant="ghost" size="icon" className='text-muted-foreground hover:text-destructive'>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </AlertDialogTrigger>
@@ -182,11 +188,27 @@ export default function Notepad() {
                       </AlertDialogHeader>
                       <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => handleDelete(selectedNote.id)}>Delete</AlertDialogAction>
+                        <AlertDialogAction onClick={() => handleDelete(selectedNote.id)} className='bg-destructive hover:bg-destructive/90'>Delete</AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
                 )}
+              </div>
+              <ScrollArea className="flex-1">
+                <Textarea
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  className="h-full w-full border-none resize-none focus-visible:ring-0 shadow-none text-base p-4"
+                  placeholder="Start writing..."
+                />
+              </ScrollArea>
+              <div className="p-2 border-t flex justify-end gap-2">
+                <Button variant="ghost" onClick={handleCancel}>
+                  <X className="mr-2 h-4 w-4" /> Cancel
+                </Button>
+                <Button onClick={handleSave} disabled={!title.trim()}>
+                  <Save className="mr-2 h-4 w-4" /> Save
+                </Button>
               </div>
             </div>
           ) : (

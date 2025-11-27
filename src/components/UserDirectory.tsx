@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Search, SlidersHorizontal, Users } from 'lucide-react';
 import { SidebarHeader, SidebarContent, SidebarFooter } from '@/components/ui/sidebar';
-import { Tooltip, TooltipContent, TooltipTrigger } from './ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 
 export default function UserDirectory() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -30,12 +30,16 @@ export default function UserDirectory() {
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
        <SidebarHeader className="p-4 group-data-[collapsible=icon]:p-2">
         <div className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Users className="h-6 w-6" />
-            </TooltipTrigger>
-            <TooltipContent side="right">Organization Members</TooltipContent>
-          </Tooltip>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className='p-1'>
+                  <Users className="h-6 w-6" />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="right">Organization Members</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <h2 className="text-xl font-bold font-headline group-data-[collapsible=icon]:hidden">Members</h2>
         </div>
         <div className="relative mt-4 group-data-[collapsible=icon]:hidden">
