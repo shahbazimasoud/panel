@@ -106,7 +106,8 @@ service cloud.firestore {
        */
       match /notes/{noteId} {
         allow read: if isOwner(userId);
-        allow create, update: if isOwner(userId) && request.resource.data.userId == userId;
+        allow create: if isOwner(userId) && request.resource.data.userId == userId;
+        allow update: if isOwner(userId) && request.resource.data.userId == resource.data.userId;
         allow delete: if isOwner(userId);
       }
     }

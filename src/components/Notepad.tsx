@@ -99,6 +99,7 @@ export default function Notepad() {
           title: debouncedTitle.trim(),
           content: debouncedContent,
           updatedAt: serverTimestamp(),
+          userId: user.uid // Ensure userId is present for security rules
       };
       updateDoc(noteRef, updatedData).catch(error => {
         const permissionError = new FirestorePermissionError({
@@ -192,95 +193,91 @@ export default function Notepad() {
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
-      <div className="p-4 border-b group-data-[collapsible=icon]:hidden">
-        <h2 className="text-xl font-bold font-headline flex items-center gap-2"><Notebook className="h-6 w-6" />Notepad</h2>
-      </div>
-
-      <div className="flex flex-1 min-h-0">
-        {/* Notes List Pane */}
-        <div className={`w-1/3 min-w-0 border-r flex flex-col group-data-[collapsible=icon]:hidden ${activeView ? 'hidden sm:flex' : 'w-full'}`}>
-           <SidebarContent className='p-0'>
-             <ScrollArea className="h-full">
-              {isLoading && <p className="p-4 text-sm text-muted-foreground">Loading notes...</p>}
-              {!isLoading && notes?.length === 0 && (
-                <div className='p-4 text-center text-sm text-muted-foreground'>No notes yet. Create one!</div>
-              )}
-              {notes?.map(note => (
-                <button
-                  key={note.id}
-                  onClick={() => handleSelectNote(note)}
-                  className={`block w-full text-left p-3 border-b hover:bg-sidebar-accent transition-colors ${selectedNote?.id === note.id ? 'bg-sidebar-accent' : ''}`}
-                >
-                  <h3 className="font-semibold truncate">{note.title || "Untitled Note"}</h3>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {note.updatedAt ? formatDistanceToNow(note.updatedAt, { addSuffix: true }) : '...'}
-                  </p>
-                </button>
-              ))}
-            </ScrollArea>
-           </SidebarContent>
-          <SidebarFooter className="p-2 border-t">
-            <Button onClick={handleNewNoteClick} className="w-full" disabled={isCreating}>
-              <Plus className="mr-2 h-4 w-4" /> New Note
-            </Button>
-          </SidebarFooter>
-        </div>
-
-        {/* Editor Pane */}
-        <div className={`flex-1 min-w-0 group-data-[collapsible=icon]:hidden ${activeView ? 'flex' : 'hidden sm:flex'}`}>
-          {activeView ? (
-            <div className="flex flex-col h-full w-full">
-               <div className="p-2 border-b flex items-center gap-2 justify-between">
-                <Input
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="text-lg font-bold border-none focus-visible:ring-0 shadow-none flex-1"
-                  placeholder="Note Title"
-                  disabled={isCreating}
-                />
-                 {selectedNote && (
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="ghost" size="icon" className='text-muted-foreground hover:text-destructive'>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This action cannot be undone. This will permanently delete this note.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => handleDelete(selectedNote.id)} className='bg-destructive hover:bg-destructive/90'>Delete</AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+        <div className="flex flex-1 min-h-0">
+            {/* Notes List Pane */}
+            <div className={`w-1/3 min-w-0 border-r flex flex-col group-data-[collapsible=icon]:hidden ${activeView ? 'hidden sm:flex' : 'w-full'}`}>
+            <SidebarContent className='p-0'>
+                <ScrollArea className="h-full">
+                {isLoading && <p className="p-4 text-sm text-muted-foreground">Loading notes...</p>}
+                {!isLoading && notes?.length === 0 && (
+                    <div className='p-4 text-center text-sm text-muted-foreground'>No notes yet. Create one!</div>
                 )}
-              </div>
-              <div className="flex-1 overflow-y-auto">
-                 <Textarea
-                  ref={textareaRef}
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  className="w-full border-none resize-none focus-visible:ring-0 shadow-none text-base p-4 overflow-hidden"
-                  placeholder="Start writing..."
-                  disabled={isCreating}
-                  rows={1}
-                />
-              </div>
+                {notes?.map(note => (
+                    <button
+                    key={note.id}
+                    onClick={() => handleSelectNote(note)}
+                    className={`block w-full text-left p-3 border-b hover:bg-sidebar-accent transition-colors ${selectedNote?.id === note.id ? 'bg-sidebar-accent' : ''}`}
+                    >
+                    <h3 className="font-semibold truncate">{note.title || "Untitled Note"}</h3>
+                    <p className="text-xs text-muted-foreground truncate">
+                        {note.updatedAt ? formatDistanceToNow(note.updatedAt, { addSuffix: true }) : '...'}
+                    </p>
+                    </button>
+                ))}
+                </ScrollArea>
+            </SidebarContent>
+            <SidebarFooter className="p-2 border-t">
+                <Button onClick={handleNewNoteClick} className="w-full" disabled={isCreating}>
+                <Plus className="mr-2 h-4 w-4" /> New Note
+                </Button>
+            </SidebarFooter>
             </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full text-center p-4">
-              <FilePen className="h-16 w-16 text-muted-foreground/50" />
-              <h3 className="mt-4 text-lg font-semibold">Select a note or create one</h3>
-              <p className="text-sm text-muted-foreground">Your personal space for thoughts and ideas.</p>
+
+            {/* Editor Pane */}
+            <div className={`flex-1 min-w-0 group-data-[collapsible=icon]:hidden ${activeView ? 'flex' : 'hidden sm:flex'}`}>
+            {activeView ? (
+                <div className="flex flex-col h-full w-full">
+                <div className="p-2 border-b flex items-center gap-2 justify-between">
+                    <Input
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="text-lg font-bold border-none focus-visible:ring-0 shadow-none flex-1"
+                    placeholder="Note Title"
+                    disabled={isCreating}
+                    />
+                    {selectedNote && (
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="icon" className='text-muted-foreground hover:text-destructive'>
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete this note.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleDelete(selectedNote.id)} className='bg-destructive hover:bg-destructive/90'>Delete</AlertDialogAction>
+                        </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                    )}
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                    <Textarea
+                    ref={textareaRef}
+                    value={content}
+                    onChange={(e) => setContent(e.target.value)}
+                    className="w-full border-none resize-none focus-visible:ring-0 shadow-none text-base p-4 overflow-hidden"
+                    placeholder="Start writing..."
+                    disabled={isCreating}
+                    rows={1}
+                    />
+                </div>
+                </div>
+            ) : (
+                <div className="flex flex-col items-center justify-center h-full text-center p-4">
+                <FilePen className="h-16 w-16 text-muted-foreground/50" />
+                <h3 className="mt-4 text-lg font-semibold">Select a note or create one</h3>
+                <p className="text-sm text-muted-foreground">Your personal space for thoughts and ideas.</p>
+                </div>
+            )}
             </div>
-          )}
         </div>
-      </div>
     </div>
   );
 }
