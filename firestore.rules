@@ -1,0 +1,149 @@
+/**
+ * Core Philosophy: This ruleset enforces a hybrid security model combining strict user-ownership with a global admin role.
+ * Regular users have full control over their own data tree (/users/{userId}), but cannot access anyone else's.
+ * A special collection, /roles_admin, grants elevated privileges; the existence of a document for a user in this collection
+ * makes them an administrator. Administrators have write access to site-wide collections like /organizationalSystems
+ * and /siteConfiguration.
+ *
+ * Data Structure:
+ * - /users/{userId} -> User-specific data, including a subcollection for loginReports.
+ * - /roles_admin/{userId} -> A list of documents where each document ID is a user's UID, granting them admin rights (DBAC).
+ * - /organizationalSystems/{organizationalSystemId} -> Publicly readable list of systems, managed by admins.
+ * - /siteConfiguration/{siteConfigurationId} -> Publicly readable site settings, managed by admins.
+ *
+ * Key Security Decisions:
+ * - User Listing Disabled: To protect user privacy, listing the top-level /users collection is disallowed.
+ * - Admin by Existence: Administrator status is determined by a fast `exists()` check on the /roles_admin/{userId} path,
+ *   avoiding slow and costly `get()` calls in rules. This is a form of Database-Based Access Control (DBAC).
+ * - Public Data Segregation: Publicly readable data (systems, site config) is stored in separate top-level collections
+ *   from private user data. This allows for simple, secure, and performant rules for read operations.
+ * - Prototyping Flexibility: Data shapes are not strictly enforced. Rules focus solely on authorization (who can access what)
+ *   and relational integrity (e.g., ensuring a login report's `userId` field matches its parent path).
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    //-------------------------------------------------------------------------
+    // Helper Functions
+    //-------------------------------------------------------------------------
+
+    /**
+     * Checks if the user is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Checks if the currently authenticated user's UID matches the given userId.
+     * This is the foundation of the user-ownership model.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * Checks if the requesting user is an administrator by verifying the
+     * existence of their UID in the roles_admin collection.
+     */
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+    }
+
+    /**
+     * Confirms ownership for an existing document, preventing modification or
+     * deletion of non-existent data.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    //-------------------------------------------------------------------------
+    // User Data Rules
+    //-------------------------------------------------------------------------
+
+    /**
+     * @description A user can manage their own profile document. No one else can read or write to it.
+     * @path /users/{userId}
+     * @allow A user (uid: 'user123') can (get) their own document at /users/user123.
+     * @deny An anonymous user cannot (get) any user document.
+     * @deny A user (uid: 'user123') cannot (get) another user's document at /users/user456.
+     * @deny Listing all users is explicitly forbidden to protect user privacy.
+     * @principle Restricts access to a user's own data tree (Ownership).
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
+
+      /**
+       * @description A user can manage their own login history.
+       * @path /users/{userId}/loginReports/{loginReportId}
+       * @allow A user (uid: 'user123') can (list) their own login reports.
+       * @deny A user (uid: 'user123') cannot (create) a login report for another user at /users/user456/loginReports/report_abc.
+       * @principle Enforces document ownership within a user-specific subcollection.
+       */
+      match /loginReports/{loginReportId} {
+        allow get: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && request.resource.data.userId == userId;
+        allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
+        allow delete: if isExistingOwner(userId);
+      }
+    }
+
+    //-------------------------------------------------------------------------
+    // Admin & Configuration Rules
+    //-------------------------------------------------------------------------
+
+    /**
+     * @description Only administrators can read or modify admin role documents.
+     * @path /roles_admin/{userId}
+     * @allow An admin can (create) a new document at /roles_admin/newUser123 to grant them admin rights.
+     * @deny A non-admin user cannot (list) the /roles_admin collection.
+     * @deny A non-admin user cannot (create) a document for themselves to become an admin.
+     * @principle Implements Database-Based Access Control (DBAC) for role management.
+     */
+    match /roles_admin/{userId} {
+      allow get: if isAdmin();
+      allow list: if isAdmin();
+      allow create: if isAdmin() && request.resource.data.userId == userId;
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
+    }
+
+    /**
+     * @description Organizational systems are publicly readable, but only admins can create, update, or delete them.
+     * @path /organizationalSystems/{organizationalSystemId}
+     * @allow Any user, including anonymous ones, can (get) or (list) documents in this collection.
+     * @deny A non-admin user cannot (create) a new organizational system.
+     * @deny A non-admin user cannot (delete) an existing organizational system.
+     * @principle Segregates public read-only data from admin-only write operations.
+     */
+    match /organizationalSystems/{organizationalSystemId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
+    }
+
+    /**
+     * @description Site configuration is publicly readable, but only admins can change settings.
+     * @path /siteConfiguration/{siteConfigurationId}
+     * @allow Any user, including anonymous ones, can (get) the site configuration.
+     * @deny A signed-in, non-admin user cannot (update) the site logo URL.
+     * @principle Secures site-wide settings to be modified only by trusted administrators.
+     */
+    match /siteConfiguration/{siteConfigurationId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if isAdmin();
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
+    }
+  }
+}

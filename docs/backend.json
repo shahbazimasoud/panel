@@ -1,0 +1,288 @@
+{
+  "entities": {
+    "OrganizationalSystem": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "OrganizationalSystem",
+      "type": "object",
+      "description": "Represents an organizational system displayed in the system list.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the OrganizationalSystem entity."
+        },
+        "title": {
+          "type": "string",
+          "description": "The title of the organizational system."
+        },
+        "description": {
+          "type": "string",
+          "description": "A brief description of the organizational system."
+        },
+        "imageUrl": {
+          "type": "string",
+          "description": "URL of the image or icon representing the system.",
+          "format": "uri"
+        },
+        "link": {
+          "type": "string",
+          "description": "URL to access the organizational system.",
+          "format": "uri"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "description",
+        "imageUrl",
+        "link"
+      ]
+    },
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user in the organization, synchronized from Active Directory.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the User entity (likely the Active Directory ID)."
+        },
+        "username": {
+          "type": "string",
+          "description": "The user's username."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "The user's display name."
+        },
+        "email": {
+          "type": "string",
+          "description": "The user's email address.",
+          "format": "email"
+        },
+        "department": {
+          "type": "string",
+          "description": "The user's department."
+        },
+        "profileImageUrl": {
+          "type": "string",
+          "description": "URL of the user's profile image.",
+          "format": "uri"
+        },
+        "bio": {
+          "type": "string",
+          "description": "A short biography of the user."
+        },
+        "lastLogin": {
+          "type": "string",
+          "description": "The user's last login datetime.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "username",
+        "displayName",
+        "email",
+        "department",
+        "profileImageUrl"
+      ]
+    },
+    "AdminUser": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "AdminUser",
+      "type": "object",
+      "description": "Represents an administrator user with elevated privileges.  Note: Authentication details should be managed by an external auth system.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the AdminUser entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: AdminUser 1:1 User) - Links to user details."
+        },
+        "role": {
+          "type": "string",
+          "description": "The role of the admin user (e.g., 'superadmin', 'systemadmin')."
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "role"
+      ]
+    },
+    "SiteConfiguration": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "SiteConfiguration",
+      "type": "object",
+      "description": "Represents site-wide configurations that can be customized by admins.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the SiteConfiguration entity."
+        },
+        "primaryColor": {
+          "type": "string",
+          "description": "The primary color of the site (e.g., '#3F51B5')."
+        },
+        "backgroundColor": {
+          "type": "string",
+          "description": "The background color of the site (e.g., '#E8EAF6')."
+        },
+        "accentColor": {
+          "type": "string",
+          "description": "The accent color of the site (e.g., '#009688')."
+        },
+        "logoUrl": {
+          "type": "string",
+          "description": "URL of the organization's logo.",
+          "format": "uri"
+        },
+        "idleTimeout": {
+          "type": "number",
+          "description": "The idle timeout duration in seconds before a user is considered idle."
+        }
+      },
+      "required": [
+        "id",
+        "primaryColor",
+        "backgroundColor",
+        "accentColor",
+        "logoUrl",
+        "idleTimeout"
+      ]
+    },
+    "LoginReport": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "LoginReport",
+      "type": "object",
+      "description": "Represents a login event for a user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the LoginReport entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N LoginReport) - The user associated with the login event."
+        },
+        "loginTime": {
+          "type": "string",
+          "description": "The date and time of the login event.",
+          "format": "date-time"
+        },
+        "logoutTime": {
+          "type": "string",
+          "description": "The date and time of the logout event.  Null if the user is still logged in.",
+          "format": "date-time"
+        },
+        "sessionDuration": {
+          "type": "number",
+          "description": "The duration of the session in seconds."
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "loginTime"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profile data.  Path-based ownership ensures only the user can access their data. Includes the userId as a param for path-based ownership.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/loginReports/{loginReportId}",
+        "definition": {
+          "entityName": "LoginReport",
+          "schema": {
+            "$ref": "#/backend/entities/LoginReport"
+          },
+          "description": "Stores login reports for each user. Path-based ownership ensures only the user can access their data. Includes the userId as a param for path-based ownership.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "loginReportId",
+              "description": "The unique identifier for the login report."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/roles_admin/{userId}",
+        "definition": {
+          "entityName": "AdminUser",
+          "schema": {
+            "$ref": "#/backend/entities/AdminUser"
+          },
+          "description": "Marks a user as an administrator. The existence of a document indicates admin privileges. This implements DBAC (Database-Based Access Control). Includes the userId as a param for path-based authorization.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the admin user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/organizationalSystems/{organizationalSystemId}",
+        "definition": {
+          "entityName": "OrganizationalSystem",
+          "schema": {
+            "$ref": "#/backend/entities/OrganizationalSystem"
+          },
+          "description": "Stores the list of organizational systems displayed in the system list. No authorization dependencies.",
+          "params": [
+            {
+              "name": "organizationalSystemId",
+              "description": "The unique identifier for the organizational system."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/siteConfiguration/{siteConfigurationId}",
+        "definition": {
+          "entityName": "SiteConfiguration",
+          "schema": {
+            "$ref": "#/backend/entities/SiteConfiguration"
+          },
+          "description": "Stores site-wide configuration settings customizable by admins.",
+          "params": [
+            {
+              "name": "siteConfigurationId",
+              "description": "The unique identifier for the site configuration."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to provide a secure and scalable backend for the OrgConnect application, adhering to the principles of Authorization Independence, Clarity of Intent, DBAC (Database-Based Access Control), and QAPs (Rules are not Filters). Authorization Independence is achieved through denormalization of access control lists, eliminating the need for `get()` calls in security rules.\n\n1.  **Users Collection:** Stores user data with standard profile information. Login reports are stored as subcollections to enable efficient querying and management of login history.\n2.  **Admin Users Collection:** Maintains a list of administrator users. The existence of a document in this collection grants admin privileges, simplifying role-based access control. This implements Database-Based Access Control (DBAC).\n3.  **Organizational Systems Collection:** Contains a list of organizational systems that can be displayed in the system list. Admins manage these entries.\n4.  **Site Configuration Document:** Holds site-wide configuration settings that admins can customize.\n\n**Authorization Independence:**\n*   The structure does not require `get()` calls in security rules because user roles are determined by the existence of a document in `/roles_admin/{userId}`. Similarly, ownership is determined by path-based ownership for user-specific data.\n\n**QAPs (Rules are not Filters):**\n*   The segregation of data into different collections based on access levels (e.g., `/users/{userId}` for user-specific data, `/roles_admin/{userId}` for admin roles, and `/organizationalSystems` for public organizational systems) ensures that security rules can be applied without filtering data, thus satisfying the QAPs principle.\n*   The online status of users (green, yellow, red) will need to be managed outside of Firestore, as Firestore is not suitable for real-time presence detection. This can be achieved using Firebase Realtime Database or another real-time solution. This external mechanism will need to update the UI based on the status updates received from the chosen real-time database.\n\n**Admin Role Management:**\n*   Admins are managed through the `/roles_admin/{userId}` collection. The existence of a document indicates that the user is an administrator. This is an example of DBAC, as roles are stored directly in the database.\n\n**Login Reporting:**\n*   Login reports are stored in a subcollection `/users/{userId}/loginReports/{loginReportId}` to efficiently query the login history of a user. The logout time and session duration can be updated when a user logs out.\n\nThis structure facilitates simple, robust, and easily debuggable security rules by:"
+  }
+}
