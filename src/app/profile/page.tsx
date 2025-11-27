@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { users } from '@/lib/data';
 import Link from 'next/link';
+import MainLayout from '@/components/MainLayout';
 
 // This is a mock. In a real app, you'd get this from a session/context.
 const useAuth = () => {
@@ -37,18 +38,12 @@ export default function ProfilePage() {
       const savedBio = user.bio || '';
       setBio(savedBio);
       setCharCount(savedBio.length);
-    } else if (typeof window !== 'undefined' && localStorage.getItem('isAuthenticated') !== 'true') {
-        router.push('/login');
     }
-  }, [user, router]);
-
+  }, [user]);
 
   if (!user) {
-    return (
-       <div className="flex min-h-screen items-center justify-center">
-        <p>Loading user profile...</p>
-      </div>
-    );
+    // This can be a loading state or null if MainLayout handles redirection
+    return null;
   }
   
   const handleBioChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -80,59 +75,61 @@ export default function ProfilePage() {
     .join('');
 
   return (
-    <div className="container mx-auto max-w-3xl p-4 sm:p-6 lg:p-8">
-       <div className="mb-8">
-        <h1 className="text-3xl font-bold font-headline">Your Profile</h1>
-        <p className="text-muted-foreground">Manage your personal information and status.</p>
+    <MainLayout>
+      <div className="container mx-auto max-w-3xl p-4 sm:p-6 lg:p-8">
+        <div className="mb-8">
+            <h1 className="text-3xl font-bold font-headline">Your Profile</h1>
+            <p className="text-muted-foreground">Manage your personal information and status.</p>
+        </div>
+        <Card>
+            <CardHeader>
+            <div className="flex items-center gap-6">
+                <Avatar className="h-24 w-24 border-4 border-primary/20">
+                <AvatarImage src={user.avatarUrl} alt={user.name} />
+                <AvatarFallback className="text-4xl">{fallback}</AvatarFallback>
+                </Avatar>
+                <div>
+                <CardTitle className="text-3xl">{user.name}</CardTitle>
+                <CardDescription className="text-lg">{user.department}</CardDescription>
+                </div>
+            </div>
+            </CardHeader>
+            <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input id="email" value={user.email} disabled />
+                    </div>
+                    <div className="space-y-2">
+                    <Label htmlFor="extension">Extension</Label>
+                    <Input id="extension" value={user.extension || 'N/A'} disabled />
+                    </div>
+                </div>
+                <div className="space-y-2">
+                <Label htmlFor="bio">Status Message (Bio)</Label>
+                <Textarea
+                    id="bio"
+                    placeholder="What are you working on?"
+                    value={bio}
+                    onChange={handleBioChange}
+                    className="min-h-[100px]"
+                    maxLength={200}
+                />
+                <p className="text-right text-sm text-muted-foreground">
+                    {charCount} / 200
+                </p>
+                </div>
+                <div className="flex justify-end gap-2">
+                    <Button variant="outline" asChild>
+                        <Link href="/">Cancel</Link>
+                    </Button>
+                <Button type="submit">Save Changes</Button>
+                </div>
+            </form>
+            </CardContent>
+        </Card>
       </div>
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-6">
-            <Avatar className="h-24 w-24 border-4 border-primary/20">
-              <AvatarImage src={user.avatarUrl} alt={user.name} />
-              <AvatarFallback className="text-4xl">{fallback}</AvatarFallback>
-            </Avatar>
-            <div>
-              <CardTitle className="text-3xl">{user.name}</CardTitle>
-              <CardDescription className="text-lg">{user.department}</CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" value={user.email} disabled />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="extension">Extension</Label>
-                  <Input id="extension" value={user.extension || 'N/A'} disabled />
-                </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="bio">Status Message (Bio)</Label>
-              <Textarea
-                id="bio"
-                placeholder="What are you working on?"
-                value={bio}
-                onChange={handleBioChange}
-                className="min-h-[100px]"
-                maxLength={200}
-              />
-              <p className="text-right text-sm text-muted-foreground">
-                {charCount} / 200
-              </p>
-            </div>
-            <div className="flex justify-end gap-2">
-                <Button variant="outline" asChild>
-                    <Link href="/">Cancel</Link>
-                </Button>
-              <Button type="submit">Save Changes</Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+    </MainLayout>
   );
 }
