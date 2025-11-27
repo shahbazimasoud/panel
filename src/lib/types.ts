@@ -6,6 +6,7 @@ export interface User {
   avatarUrl: string;
   status: UserStatus;
   department: string;
+  email: string;
   bio?: string;
   extension?: string;
 }

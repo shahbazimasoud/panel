@@ -29,14 +29,24 @@ export default function UserListItem({ user }: UserListItemProps) {
   const { toast } = useToast();
   const { open: sidebarOpen } = useSidebar();
 
-  const handleUserClick = () => {
+  const handleDoubleClick = () => {
     // In a real app, this would integrate with Cisco Jabber or another messenger
-    // For example: window.location.href = `jabber:user@example.com`;
     toast({
-      title: 'Send Message',
-      description: `Opening chat window with ${user.name}... (simulation)`,
+      title: 'Starting Chat...',
+      description: `Opening Cisco Jabber chat with ${user.name}.`,
     });
-    console.log(`Starting chat with ${user.name}`);
+    window.location.href = `im:${user.email}`;
+  };
+
+  const handleCallClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent the popover from closing
+    if (user.extension) {
+      toast({
+        title: 'Starting Call...',
+        description: `Calling extension ${user.extension} via Cisco Jabber.`,
+      });
+      window.location.href = `tel:${user.extension}`;
+    }
   };
 
   const fallback = user.name
@@ -46,6 +56,7 @@ export default function UserListItem({ user }: UserListItemProps) {
 
   const userContent = (
     <div
+      onDoubleClick={handleDoubleClick}
       className={cn(
         "w-full text-left p-2 rounded-md hover:bg-sidebar-accent transition-colors flex items-center gap-3 cursor-pointer",
         !sidebarOpen && "justify-center"
@@ -85,10 +96,14 @@ export default function UserListItem({ user }: UserListItemProps) {
           <h4 className="text-lg font-bold">{user.name}</h4>
           <p className="text-sm text-muted-foreground">{user.department}</p>
           {user.extension && (
-            <div className="flex items-center text-sm text-muted-foreground pt-1">
+            <a
+              href={`tel:${user.extension}`}
+              onClick={handleCallClick}
+              className="flex items-center text-sm text-muted-foreground pt-1 hover:text-primary cursor-pointer"
+            >
               <Phone className="mr-2 h-4 w-4" />
               <span>Ext: {user.extension}</span>
-            </div>
+            </a>
           )}
         </div>
       </div>
@@ -101,7 +116,7 @@ export default function UserListItem({ user }: UserListItemProps) {
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
-            <div onClick={handleUserClick}>{userContent}</div>
+            <div onDoubleClick={handleDoubleClick}>{userContent}</div>
           </TooltipTrigger>
           <TooltipContent side="right">
             <p className="font-semibold">{user.name}</p>
