@@ -1,15 +1,15 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useLayoutEffect, useRef } from 'react';
 import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
 import type { Note, NoteDTO } from '@/lib/types';
 import { collection, query, orderBy, serverTimestamp, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { SidebarHeader, SidebarContent, SidebarFooter } from '@/components/ui/sidebar';
+import { SidebarHeader, SidebarContent, SidebarFooter, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Notebook, Plus, Trash2, FilePen } from 'lucide-react';
+import { Notebook, Plus, Trash2, FilePen, Users } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import {
   AlertDialog,
@@ -37,6 +37,19 @@ const useDebounce = (value: any, delay: number) => {
         };
     }, [value, delay]);
     return debouncedValue;
+};
+
+// Custom hook to auto-resize textarea
+const useAutoResizeTextarea = (value: string) => {
+    const ref = useRef<HTMLTextAreaElement>(null);
+    useLayoutEffect(() => {
+        const textarea = ref.current;
+        if (textarea) {
+            textarea.style.height = 'auto'; // Reset height
+            textarea.style.height = `${textarea.scrollHeight}px`; // Set to scroll height
+        }
+    }, [value]);
+    return ref;
 };
 
 
@@ -71,6 +84,8 @@ export default function Notepad() {
 
   const debouncedTitle = useDebounce(title, 1500);
   const debouncedContent = useDebounce(content, 1500);
+  const textareaRef = useAutoResizeTextarea(content);
+
 
   // Auto-save logic
   useEffect(() => {
@@ -177,18 +192,15 @@ export default function Notepad() {
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
-      <SidebarHeader className="p-4 border-b">
-        <div className="flex items-center gap-2">
-          <Notebook className="h-6 w-6" />
-          <h2 className="text-xl font-bold font-headline">Notepad</h2>
-        </div>
-      </SidebarHeader>
+      <div className="p-4 border-b group-data-[collapsible=icon]:hidden">
+        <h2 className="text-xl font-bold font-headline flex items-center gap-2"><Notebook className="h-6 w-6" />Notepad</h2>
+      </div>
 
       <div className="flex flex-1 min-h-0">
         {/* Notes List Pane */}
-        <div className={`w-1/3 min-w-0 border-r flex flex-col ${activeView ? 'hidden sm:flex' : 'w-full'}`}>
-          <SidebarContent className='p-0'>
-            <ScrollArea className="h-full">
+        <div className={`w-1/3 min-w-0 border-r flex flex-col group-data-[collapsible=icon]:hidden ${activeView ? 'hidden sm:flex' : 'w-full'}`}>
+           <SidebarContent className='p-0'>
+             <ScrollArea className="h-full">
               {isLoading && <p className="p-4 text-sm text-muted-foreground">Loading notes...</p>}
               {!isLoading && notes?.length === 0 && (
                 <div className='p-4 text-center text-sm text-muted-foreground'>No notes yet. Create one!</div>
@@ -206,7 +218,7 @@ export default function Notepad() {
                 </button>
               ))}
             </ScrollArea>
-          </SidebarContent>
+           </SidebarContent>
           <SidebarFooter className="p-2 border-t">
             <Button onClick={handleNewNoteClick} className="w-full" disabled={isCreating}>
               <Plus className="mr-2 h-4 w-4" /> New Note
@@ -215,10 +227,10 @@ export default function Notepad() {
         </div>
 
         {/* Editor Pane */}
-        <div className={`flex-1 min-w-0 ${activeView ? 'flex' : 'hidden sm:flex'}`}>
+        <div className={`flex-1 min-w-0 group-data-[collapsible=icon]:hidden ${activeView ? 'flex' : 'hidden sm:flex'}`}>
           {activeView ? (
             <div className="flex flex-col h-full w-full">
-              <div className="p-2 border-b flex items-center gap-2 justify-between">
+               <div className="p-2 border-b flex items-center gap-2 justify-between">
                 <Input
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
@@ -248,15 +260,17 @@ export default function Notepad() {
                   </AlertDialog>
                 )}
               </div>
-              <ScrollArea className="flex-1">
-                <Textarea
+              <div className="flex-1 overflow-y-auto">
+                 <Textarea
+                  ref={textareaRef}
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
-                  className="h-full w-full border-none resize-none focus-visible:ring-0 shadow-none text-base p-4"
+                  className="w-full border-none resize-none focus-visible:ring-0 shadow-none text-base p-4 overflow-hidden"
                   placeholder="Start writing..."
                   disabled={isCreating}
+                  rows={1}
                 />
-              </ScrollArea>
+              </div>
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-center p-4">
