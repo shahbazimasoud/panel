@@ -18,3 +18,11 @@ export interface System {
   icon: string; // lucide-react icon name
   url: string;
 }
+
+export interface Guide {
+  id: string;
+  name: string;
+  description: string;
+  icon: string; // lucide-react icon name
+  url: string;
+}
