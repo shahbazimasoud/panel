@@ -1,5 +1,5 @@
 'use client';
-import { addDoc, collection, getDocs, query, where, orderBy, Timestamp, Firestore } from 'firebase/firestore';
+import { addDoc, collection, getDocs, query, where, Timestamp, Firestore } from 'firebase/firestore';
 import type { ActivityLogEvent, ActivityLogEventDTO } from './types';
 import { isSameDay, startOfDay } from 'date-fns';
 import { errorEmitter } from '@/firebase/error-emitter';
@@ -94,8 +94,7 @@ export const getTodayTotalDuration = async (firestore: Firestore, userId: string
     const q = query(
         activityCollection,
         where('userId', '==', userId),
-        where('timestamp', '>=', Timestamp.fromDate(startOfToday)),
-        orderBy('timestamp', 'asc')
+        where('timestamp', '>=', Timestamp.fromDate(startOfToday))
     );
 
     const querySnapshot = await getDocs(q);
@@ -105,7 +104,7 @@ export const getTodayTotalDuration = async (firestore: Firestore, userId: string
             ...data,
             timestamp: data.timestamp.toMillis(),
         };
-    });
+    }).sort((a, b) => a.timestamp - b.timestamp); // Sort events on the client-side
 
     return calculateDailyTotal(events, today);
 };
@@ -115,7 +114,10 @@ export const calculateDailyTotal = (dailyEvents: ActivityLogEvent[], date: Date)
     let totalMilliseconds = 0;
     let lastActiveTimestamp: number | null = null;
 
-    for (const event of dailyEvents) {
+    // Ensure events are sorted chronologically
+    const sortedEvents = [...dailyEvents].sort((a,b) => a.timestamp - b.timestamp);
+
+    for (const event of sortedEvents) {
         if (event.type === 'ACTIVE' || event.type === 'LOGIN') {
             if (lastActiveTimestamp === null) {
                 lastActiveTimestamp = event.timestamp;

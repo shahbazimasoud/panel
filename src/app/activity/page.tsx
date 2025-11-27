@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import MainLayout from '@/components/MainLayout';
 import Link from 'next/link';
 import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy } from 'firebase/firestore';
+import { collection, query, where } from 'firebase/firestore';
 
 type DailyLog = {
   date: string;
@@ -87,7 +87,7 @@ export default function ActivityPage() {
     const rawLog: ActivityLogEvent[] = rawLogDTO.map(dto => ({
         ...dto,
         timestamp: dto.timestamp.toMillis(),
-    })).sort((a, b) => b.timestamp - a.timestamp); // Sort on the client
+    }));
 
     const filteredLog = rawLog.filter(event => {
       const isDateMatch = !dateFilter || isSameDay(new Date(event.timestamp), startOfDay(dateFilter));
@@ -97,16 +97,19 @@ export default function ActivityPage() {
     
     const groupedByDay: Record<string, { events: ActivityLogEvent[], totalActiveSeconds: number }> = {};
 
-    for (const event of rawLog) { 
+    // Group all events by day first to calculate totals correctly, regardless of filter
+    const allEventsSorted = [...rawLog].sort((a, b) => a.timestamp - b.timestamp);
+    for (const event of allEventsSorted) {
       const dateKey = format(new Date(event.timestamp), 'eeee, MMMM do, yyyy');
       if (!groupedByDay[dateKey]) {
         groupedByDay[dateKey] = { events: [], totalActiveSeconds: 0 };
       }
+      groupedByDay[dateKey].events.push(event);
     }
     
+    // Calculate total active time for each day that has events
     Object.keys(groupedByDay).forEach(dateKey => {
-        const dayEvents = rawLog.filter(e => format(new Date(e.timestamp), 'eeee, MMMM do, yyyy') === dateKey);
-        groupedByDay[dateKey].totalActiveSeconds = calculateDailyTotal(dayEvents, new Date(dateKey));
+        groupedByDay[dateKey].totalActiveSeconds = calculateDailyTotal(groupedByDay[dateKey].events, new Date(dateKey));
     });
 
     const displayGroupedByDay: Record<string, { events: ActivityLogEvent[] }> = {};
@@ -118,9 +121,11 @@ export default function ActivityPage() {
       displayGroupedByDay[dateKey].events.push(event);
     }
      Object.keys(displayGroupedByDay).forEach(dateKey => {
-        displayGroupedByDay[dateKey].events.sort((a,b) => b.timestamp - a.timestamp); // newest first
+        // Sort events within each day group in descending order (newest first) for display
+        displayGroupedByDay[dateKey].events.sort((a,b) => b.timestamp - a.timestamp);
     });
 
+    // Sort the days themselves in descending order (most recent day first)
     const sortedDays = Object.keys(displayGroupedByDay).sort((a,b) => {
         return new Date(b).getTime() - new Date(a).getTime()
     });
