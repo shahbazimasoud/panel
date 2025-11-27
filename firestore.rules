@@ -10,6 +10,7 @@
  * - /roles_admin/{userId} -> A list of documents where each document ID is a user's UID, granting them admin rights (DBAC).
  * - /organizationalSystems/{organizationalSystemId} -> Publicly readable list of systems, managed by admins.
  * - /siteConfiguration/{siteConfigurationId} -> Publicly readable site settings, managed by admins.
+ * - /activityLog/{activityLogId} -> User activity events. Users can write their own events.
  *
  * Key Security Decisions:
  * - User Listing Disabled: To protect user privacy, listing the top-level /users collection is disallowed.
@@ -97,6 +98,20 @@ service cloud.firestore {
       }
     }
 
+    /**
+     * @description Users can create their own activity log entries.
+     * @path /activityLog/{activityLogId}
+     * @allow A user can create an activity log with their own userId.
+     * @deny A user cannot create an activity log for another user.
+     * @deny Reading, updating, or deleting logs is disallowed for clients.
+     */
+     match /activityLog/{activityLogId} {
+        allow get: if isOwner(resource.data.userId);
+        allow list: if isSignedIn();
+        allow create: if request.auth.uid == request.resource.data.userId;
+        allow update, delete: if false;
+     }
+
     //-------------------------------------------------------------------------
     // Admin & Configuration Rules
     //-------------------------------------------------------------------------
@@ -149,3 +164,4 @@ service cloud.firestore {
     }
   }
 }
+    

@@ -188,6 +188,52 @@
         "userId",
         "loginTime"
       ]
+    },
+    "ActivityLog": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ActivityLog",
+      "type": "object",
+      "description": "Represents a single user activity event.",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The ID of the user who performed the activity."
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "LOGIN",
+            "LOGOUT",
+            "AWAY",
+            "ACTIVE"
+          ],
+          "description": "The type of activity."
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The time the activity occurred."
+        },
+        "deviceInfo": {
+          "type": "object",
+          "properties": {
+            "device": {
+              "type": "string"
+            },
+            "os": {
+              "type": "string"
+            },
+            "browser": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "required": [
+        "userId",
+        "type",
+        "timestamp"
+      ]
     }
   },
   "auth": {
@@ -280,8 +326,25 @@
             }
           ]
         }
+      },
+      {
+        "path": "/activityLog/{activityLogId}",
+        "definition": {
+          "entityName": "ActivityLog",
+          "schema": {
+            "$ref": "#/backend/entities/ActivityLog"
+          },
+          "description": "Stores user activity logs. Users can write their own logs.",
+          "params": [
+            {
+              "name": "activityLogId",
+              "description": "The unique identifier for the activity log entry."
+            }
+          ]
+        }
       }
     ],
     "reasoning": "The Firestore structure is designed to provide a secure and scalable backend for the OrgConnect application, adhering to the principles of Authorization Independence, Clarity of Intent, DBAC (Database-Based Access Control), and QAPs (Rules are not Filters). Authorization Independence is achieved through denormalization of access control lists, eliminating the need for `get()` calls in security rules.\n\n1.  **Users Collection:** Stores user data with standard profile information. Login reports are stored as subcollections to enable efficient querying and management of login history.\n2.  **Admin Users Collection:** Maintains a list of administrator users. The existence of a document in this collection grants admin privileges, simplifying role-based access control. This implements Database-Based Access Control (DBAC).\n3.  **Organizational Systems Collection:** Contains a list of organizational systems that can be displayed in the system list. Admins manage these entries.\n4.  **Site Configuration Document:** Holds site-wide configuration settings that admins can customize.\n\n**Authorization Independence:**\n*   The structure does not require `get()` calls in security rules because user roles are determined by the existence of a document in `/roles_admin/{userId}`. Similarly, ownership is determined by path-based ownership for user-specific data.\n\n**QAPs (Rules are not Filters):**\n*   The segregation of data into different collections based on access levels (e.g., `/users/{userId}` for user-specific data, `/roles_admin/{userId}` for admin roles, and `/organizationalSystems` for public organizational systems) ensures that security rules can be applied without filtering data, thus satisfying the QAPs principle.\n*   The online status of users (green, yellow, red) will need to be managed outside of Firestore, as Firestore is not suitable for real-time presence detection. This can be achieved using Firebase Realtime Database or another real-time solution. This external mechanism will need to update the UI based on the status updates received from the chosen real-time database.\n\n**Admin Role Management:**\n*   Admins are managed through the `/roles_admin/{userId}` collection. The existence of a document indicates that the user is an administrator. This is an example of DBAC, as roles are stored directly in the database.\n\n**Login Reporting:**\n*   Login reports are stored in a subcollection `/users/{userId}/loginReports/{loginReportId}` to efficiently query the login history of a user. The logout time and session duration can be updated when a user logs out.\n\nThis structure facilitates simple, robust, and easily debuggable security rules by:"
   }
 }
+    
