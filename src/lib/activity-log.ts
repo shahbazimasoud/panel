@@ -2,6 +2,8 @@
 import { addDoc, collection, getDocs, query, where, orderBy, Timestamp, Firestore } from 'firebase/firestore';
 import type { ActivityLogEvent, ActivityLogEventDTO } from './types';
 import { isSameDay, startOfDay } from 'date-fns';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 
 function getDeviceInfo() {
     if (typeof window === 'undefined') {
@@ -47,28 +49,43 @@ function getDeviceInfo() {
 // A simple in-memory cache to prevent logging the same event type consecutively.
 let lastEventType: ActivityLogEvent['type'] | null = null;
 
-export const logActivity = async (firestore: Firestore, userId: string, type: ActivityLogEvent['type']) => {
+export const logActivity = (firestore: Firestore, userId: string, type: ActivityLogEvent['type']) => {
   if (lastEventType === type) {
     return;
   }
   lastEventType = type;
 
   const deviceInfo = getDeviceInfo();
-  const event: ActivityLogEventDTO = {
+  const event: Omit<ActivityLogEventDTO, 'timestamp'> = {
     userId,
     type,
-    timestamp: Timestamp.now(),
     deviceInfo,
   };
   
-  try {
-    const activityCollection = collection(firestore, 'activityLog');
-    await addDoc(activityCollection, event);
-  } catch (error) {
-    console.error("Error logging activity to Firestore:", error);
-    // Reset last event type if logging fails to allow retry
-    lastEventType = null;
-  }
+  const activityCollection = collection(firestore, 'activityLog');
+  
+  // Do not await, chain .catch for non-blocking error handling
+  addDoc(activityCollection, { ...event, timestamp: Timestamp.now() })
+    .catch(error => {
+      // Create a rich, contextual error
+      const permissionError = new FirestorePermissionError({
+        path: activityCollection.path,
+        operation: 'create',
+        requestResourceData: {
+            ...event,
+            timestamp: '(SERVER_TIMESTAMP)' // Placeholder for server-generated value
+        },
+      });
+
+      // Emit the error globally
+      errorEmitter.emit('permission-error', permissionError);
+
+      // Log to console for fallback debugging, but emitter is primary
+      console.error("Error logging activity to Firestore:", error);
+      
+      // Reset last event type if logging fails to allow retry
+      lastEventType = null;
+  });
 };
 
 
