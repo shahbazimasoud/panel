@@ -10,20 +10,20 @@ import { Puzzle } from 'lucide-react';
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { user, loading } = useUser();
+  const { user, isUserLoading } = useUser();
 
   useEffect(() => {
     // This effect handles redirection based on auth state.
     // It will only run AFTER the initial loading is complete.
-    if (!loading && !user) {
+    if (!isUserLoading && !user) {
       router.push('/login');
     }
-  }, [user, loading, router]);
+  }, [user, isUserLoading, router]);
 
 
   // While Firebase is checking the auth state, show a full-page loading indicator.
   // This prevents the premature rendering of content or incorrect redirects.
-  if (loading) {
+  if (isUserLoading) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">

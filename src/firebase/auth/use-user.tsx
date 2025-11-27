@@ -1,28 +1,14 @@
 'use client';
 
-import { onAuthStateChanged, type User } from 'firebase/auth';
-import { useEffect, useState } from 'react';
+import { useUser as useFirebaseUserHook } from '@/firebase/provider';
+import { type UserHookResult } from '@/firebase/provider';
 
-import { useAuth } from '@/firebase/provider';
-
-export function useUser() {
-  const auth = useAuth();
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!auth) {
-      setLoading(false);
-      return;
-    }
-
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [auth]);
-
-  return { user, loading };
-}
+/**
+ * Hook specifically for accessing the authenticated user's state.
+ * This provides the User object, loading status, and any auth errors.
+ * @returns {UserHookResult} Object with user, isUserLoading, userError.
+ */
+export const useUser = (): UserHookResult => {
+  const { user, isUserLoading, userError } = useFirebaseUserHook();
+  return { user, isUserLoading, userError };
+};
