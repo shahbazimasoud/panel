@@ -62,7 +62,7 @@ export default function LoginPage() {
       // The auth state change will be handled by the provider
       // and the useEffect above will redirect.
       // We can log the initial login activity here.
-      logActivity(firestore, userCredential.user.uid, 'LOGIN');
+      await logActivity(firestore, userCredential.user.uid, 'LOGIN');
       router.push('/');
 
     } catch (err: any) {

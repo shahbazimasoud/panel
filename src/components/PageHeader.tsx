@@ -56,14 +56,14 @@ export default function PageHeader() {
     }
   }, [firestore, authUser]);
 
-  const handleVisibilityChange = useCallback(() => {
+  const handleVisibilityChange = useCallback(async () => {
     if (!firestore || !authUser) return;
     if (document.visibilityState === 'hidden') {
-      logActivity(firestore, authUser.uid, 'AWAY');
+      await logActivity(firestore, authUser.uid, 'AWAY');
     } else {
-      logActivity(firestore, authUser.uid, 'ACTIVE');
+      await logActivity(firestore, authUser.uid, 'ACTIVE');
     }
-    updateDuration();
+    await updateDuration();
   }, [firestore, authUser, updateDuration]);
 
   useEffect(() => {

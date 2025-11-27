@@ -49,18 +49,35 @@ function getDeviceInfo() {
 // A simple in-memory cache to prevent logging the same event type consecutively.
 let lastEventType: ActivityLogEvent['type'] | null = null;
 
-export const logActivity = (firestore: Firestore, userId: string, type: ActivityLogEvent['type']) => {
+async function getIpAddress(): Promise<string> {
+    try {
+        const response = await fetch('https://api.ipify.org?format=json');
+        if (!response.ok) {
+            return 'N/A';
+        }
+        const data = await response.json();
+        return data.ip || 'N/A';
+    } catch (error) {
+        console.error('Failed to fetch IP address:', error);
+        return 'N/A';
+    }
+}
+
+
+export const logActivity = async (firestore: Firestore, userId: string, type: ActivityLogEvent['type']) => {
   if (lastEventType === type) {
     return;
   }
   lastEventType = type;
 
   const deviceInfo = getDeviceInfo();
+  const ipAddress = await getIpAddress();
+  
   const event: Omit<ActivityLogEventDTO, 'timestamp'> = {
     userId,
     type,
     deviceInfo,
-    ipAddress: 'N/A', // Requires server-side implementation
+    ipAddress,
     macAddress: 'N/A', // Cannot be retrieved from browser
   };
   
@@ -137,5 +154,3 @@ export const calculateDailyTotal = (dailyEvents: ActivityLogEvent[], date: Date)
 
     return totalMilliseconds / 1000;
 };
-
-    
