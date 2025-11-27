@@ -93,8 +93,7 @@ export const getTodayTotalDuration = async (firestore: Firestore, userId: string
     const activityCollection = collection(firestore, 'activityLog');
     const q = query(
         activityCollection,
-        where('userId', '==', userId),
-        where('timestamp', '>=', Timestamp.fromDate(startOfToday))
+        where('userId', '==', userId)
     );
 
     const querySnapshot = await getDocs(q);
@@ -104,7 +103,9 @@ export const getTodayTotalDuration = async (firestore: Firestore, userId: string
             ...data,
             timestamp: data.timestamp.toMillis(),
         };
-    }).sort((a, b) => a.timestamp - b.timestamp); // Sort events on the client-side
+    })
+    .filter(event => event.timestamp >= startOfToday.getTime())
+    .sort((a, b) => a.timestamp - b.timestamp);
 
     return calculateDailyTotal(events, today);
 };
