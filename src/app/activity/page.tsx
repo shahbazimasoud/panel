@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableRow, TableHeader, TableHead } from '@/components/ui/table';
 import { calculateDailyTotal } from '@/lib/activity-log';
 import type { ActivityLogEvent, ActivityLogEventDTO } from '@/lib/types';
 import { LogIn, LogOut, Coffee, Timer, FilterX, ArrowLeft, Monitor, Smartphone, Globe } from 'lucide-react';
@@ -80,13 +81,52 @@ export default function ActivityPage() {
   const [dateFilter, setDateFilter] = useState<Date | undefined>();
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
 
-  const processedLog = useMemo(() => {
-    if (!rawLogDTO) return [];
+  const { processedLog, overallSummary } = useMemo(() => {
+    if (!rawLogDTO) return { processedLog: [], overallSummary: { totalActiveSeconds: 0, totalAwaySeconds: 0 } };
     
     const rawLog: ActivityLogEvent[] = rawLogDTO.map(dto => ({
         ...dto,
         timestamp: dto.timestamp.toMillis(),
     }));
+
+    // --- Overall Summary Calculation ---
+    let totalActiveSeconds = 0;
+    let totalAwaySeconds = 0;
+    let lastActiveTimestamp: number | null = null;
+    let lastAwayTimestamp: number | null = null;
+
+    const allSortedEvents = [...rawLog].sort((a, b) => a.timestamp - b.timestamp);
+
+    for (const event of allSortedEvents) {
+        if (event.type === 'ACTIVE' || event.type === 'LOGIN') {
+            if (lastActiveTimestamp === null) {
+                lastActiveTimestamp = event.timestamp;
+            }
+            if (lastAwayTimestamp !== null) {
+                totalAwaySeconds += (event.timestamp - lastAwayTimestamp) / 1000;
+                lastAwayTimestamp = null;
+            }
+        } else if (event.type === 'AWAY' || event.type === 'LOGOUT') {
+            if (lastAwayTimestamp === null) {
+                lastAwayTimestamp = event.timestamp;
+            }
+            if (lastActiveTimestamp !== null) {
+                totalActiveSeconds += (event.timestamp - lastActiveTimestamp) / 1000;
+                lastActiveTimestamp = null;
+            }
+        }
+    }
+    // If the user is currently active, add the duration to the total
+    if(lastActiveTimestamp !== null) {
+      totalActiveSeconds += (Date.now() - lastActiveTimestamp) / 1000;
+    }
+
+    const overallSummary = {
+        totalActiveSeconds: totalActiveSeconds,
+        totalAwaySeconds: totalAwaySeconds,
+    };
+    // --- End of Overall Summary Calculation ---
+
 
     const groupedByDay: Record<string, { events: ActivityLogEvent[], totalActiveSeconds: number }> = {};
     for (const event of rawLog) {
@@ -125,11 +165,13 @@ export default function ActivityPage() {
         return new Date(b).getTime() - new Date(a).getTime()
     });
 
-    return sortedDays.map(dateKey => ({
+    const processedLogResult = sortedDays.map(dateKey => ({
       date: dateKey,
       events: displayGroupedByDay[dateKey].events,
       totalActiveSeconds: groupedByDay[dateKey]?.totalActiveSeconds || 0
     }));
+
+    return { processedLog: processedLogResult, overallSummary };
 
   }, [rawLogDTO, dateFilter, typeFilter]);
 
@@ -154,6 +196,28 @@ export default function ActivityPage() {
                   <p className="text-muted-foreground">A detailed log of your session activity.</p>
                 </div>
             </div>
+
+            <Card className="mb-8">
+                <CardHeader>
+                    <CardTitle>Overall Summary</CardTitle>
+                    <CardDescription>Total active and idle time based on the selected filters.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                     <Table>
+                        <TableBody>
+                            <TableRow>
+                                <TableCell className="font-medium">Total Active Time</TableCell>
+                                <TableCell className="text-right font-bold text-green-600">{formatTotalDuration(overallSummary.totalActiveSeconds)}</TableCell>
+                            </TableRow>
+                             <TableRow>
+                                <TableCell className="font-medium">Total Away Time</TableCell>
+                                <TableCell className="text-right font-bold text-yellow-600">{formatTotalDuration(overallSummary.totalAwaySeconds)}</TableCell>
+                            </TableRow>
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
+
 
             <Card className="mb-8">
                 <CardHeader>
@@ -203,9 +267,9 @@ export default function ActivityPage() {
                         <Card key={dayLog.date}>
                         <CardHeader>
                             <div className="flex justify-between items-center">
-                                <CardTitle>{dayLog.date}</CardTitle>
+                                <CardTitle className="text-xl">{dayLog.date}</CardTitle>
                                 <p className="text-sm font-medium text-muted-foreground">
-                                    Total Active Time: <span className="font-bold text-primary">{formatTotalDuration(dayLog.totalActiveSeconds)}</span>
+                                    Daily Active Time: <span className="font-bold text-primary">{formatTotalDuration(dayLog.totalActiveSeconds)}</span>
                                 </p>
                             </div>
                         </CardHeader>
@@ -274,5 +338,3 @@ export default function ActivityPage() {
     </MainLayout>
   );
 }
-
-    
