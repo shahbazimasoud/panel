@@ -156,7 +156,7 @@ export default function Notepad() {
 
       <div className="flex flex-1 min-h-0 group-data-[collapsible=icon]:hidden">
         {/* Notes List Pane */}
-        <div className={`w-1/3 border-r flex flex-col ${activeView ? 'hidden sm:flex' : 'w-full'}`}>
+        <div className={`w-1/3 min-w-0 border-r flex flex-col ${activeView ? 'hidden sm:flex' : 'w-full'}`}>
           <SidebarContent className='p-0'>
             <ScrollArea className="h-full">
               {isLoading && <p className="p-4 text-sm text-muted-foreground">Loading notes...</p>}
@@ -185,7 +185,7 @@ export default function Notepad() {
         </div>
 
         {/* Editor Pane */}
-        <div className={`flex-1 ${activeView ? 'flex' : 'hidden sm:flex'}`}>
+        <div className={`flex-1 min-w-0 ${activeView ? 'flex' : 'hidden sm:flex'}`}>
           {activeView ? (
             <div className="flex flex-col h-full w-full">
               <div className="p-2 border-b flex items-center gap-2 justify-between">
@@ -246,3 +246,5 @@ export default function Notepad() {
     </div>
   );
 }
+
+    
