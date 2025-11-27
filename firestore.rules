@@ -96,6 +96,17 @@ service cloud.firestore {
         allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
         allow delete: if isExistingOwner(userId);
       }
+      
+      /**
+       * @description A user can manage their own personal notes.
+       * @path /users/{userId}/notes/{noteId}
+       * @allow A user (uid: 'user123') can (create, read, update, delete) their own notes.
+       * @deny A user (uid: 'user123') cannot access notes of another user at /users/user456/notes/note_abc.
+       * @principle Enforces strict data ownership for personal content.
+       */
+      match /notes/{noteId} {
+        allow read, write: if isOwner(userId) && request.auth.uid == request.resource.data.userId;
+      }
     }
 
     /**
@@ -164,4 +175,3 @@ service cloud.firestore {
     }
   }
 }
-    

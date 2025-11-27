@@ -1,0 +1,203 @@
+'use client';
+
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useFirestore, useUser, useCollection, useMemoFirebase } from '@/firebase';
+import type { Note, NoteDTO } from '@/lib/types';
+import { collection, query, orderBy, serverTimestamp, addDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { SidebarHeader, SidebarContent, SidebarFooter } from '@/components/ui/sidebar';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Notebook, Plus, Trash2, Edit, Save, X, AlertTriangle } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+
+export default function Notepad() {
+  const firestore = useFirestore();
+  const { user } = useUser();
+  
+  const notesQuery = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return query(
+      collection(firestore, 'users', user.uid, 'notes'),
+      orderBy('updatedAt', 'desc')
+    );
+  }, [firestore, user]);
+
+  const { data: notesDTO, isLoading } = useCollection<NoteDTO>(notesQuery);
+
+  const notes: Note[] | null = useMemo(() => {
+    if (!notesDTO) return null;
+    return notesDTO.map(n => ({
+      ...n,
+      id: n.id,
+      createdAt: n.createdAt.toMillis(),
+      updatedAt: n.updatedAt.toMillis(),
+    }));
+  }, [notesDTO]);
+
+  const [selectedNote, setSelectedNote] = useState<Note | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+
+  const handleSelectNote = useCallback((note: Note) => {
+    setSelectedNote(note);
+    setTitle(note.title);
+    setContent(note.content);
+    setIsCreating(false);
+  }, []);
+
+  const handleNewNote = () => {
+    setIsCreating(true);
+    setSelectedNote(null);
+    setTitle('New Note');
+    setContent('');
+  };
+
+  const handleSave = async () => {
+    if (!firestore || !user) return;
+    
+    if (isCreating) {
+      const noteData = {
+        userId: user.uid,
+        title,
+        content,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+      const newDocRef = await addDoc(collection(firestore, 'users', user.uid, 'notes'), noteData);
+      setIsCreating(false);
+      // We can't immediately select the note as we don't have the final object with timestamps
+    } else if (selectedNote) {
+      const noteRef = doc(firestore, 'users', user.uid, 'notes', selectedNote.id);
+      await updateDoc(noteRef, {
+        title,
+        content,
+        updatedAt: serverTimestamp(),
+      });
+    }
+  };
+
+  const handleDelete = async (noteId: string) => {
+    if (!firestore || !user) return;
+    const noteRef = doc(firestore, 'users', user.uid, 'notes', noteId);
+    await deleteDoc(noteRef);
+    if (selectedNote?.id === noteId) {
+        setSelectedNote(null);
+        setTitle('');
+        setContent('');
+    }
+  };
+
+  const activeView = selectedNote || isCreating;
+
+  return (
+    <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
+      <SidebarHeader className="p-4">
+        <div className="flex items-center gap-2">
+          <Notebook className="h-6 w-6" />
+          <h2 className="text-xl font-bold font-headline">Notepad</h2>
+        </div>
+      </SidebarHeader>
+
+      <div className="flex flex-1 min-h-0">
+        {/* Notes List */}
+        <div className={`w-1/3 border-r group-data-[collapsible=icon]:hidden ${activeView ? 'hidden md:block' : ''}`}>
+          <SidebarContent>
+            <ScrollArea className="h-full">
+              {isLoading && <p className="p-4 text-sm text-muted-foreground">Loading notes...</p>}
+              {notes?.map(note => (
+                <button
+                  key={note.id}
+                  onClick={() => handleSelectNote(note)}
+                  className={`block w-full text-left p-3 border-b hover:bg-sidebar-accent ${selectedNote?.id === note.id ? 'bg-sidebar-accent' : ''}`}
+                >
+                  <h3 className="font-semibold truncate">{note.title}</h3>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {formatDistanceToNow(note.updatedAt, { addSuffix: true })}
+                  </p>
+                </button>
+              ))}
+            </ScrollArea>
+          </SidebarContent>
+          <SidebarFooter className="p-2 border-t group-data-[collapsible=icon]:hidden">
+            <Button onClick={handleNewNote} className="w-full">
+              <Plus className="mr-2 h-4 w-4" /> New Note
+            </Button>
+          </SidebarFooter>
+        </div>
+
+        {/* Editor / Welcome View */}
+        <div className={`flex-1 group-data-[collapsible=icon]:hidden ${activeView ? '' : 'hidden md:flex'}`}>
+          {activeView ? (
+            <div className="flex flex-col h-full w-full">
+              <div className="p-2 border-b flex items-center gap-2">
+                <Input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="text-lg font-bold border-none focus-visible:ring-0 shadow-none"
+                  placeholder="Note Title"
+                />
+              </div>
+              <ScrollArea className="flex-1">
+                <Textarea
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  className="h-full w-full border-none resize-none focus-visible:ring-0 shadow-none text-base"
+                  placeholder="Start writing..."
+                />
+              </ScrollArea>
+              <div className="p-2 border-t flex justify-end gap-2">
+                <Button variant="ghost" onClick={() => { setIsCreating(false); setSelectedNote(null); }}>
+                  <X className="mr-2 h-4 w-4" /> Cancel
+                </Button>
+                <Button onClick={handleSave}>
+                  <Save className="mr-2 h-4 w-4" /> Save
+                </Button>
+                 {selectedNote && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" size="icon">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This action cannot be undone. This will permanently delete this note.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleDelete(selectedNote.id)}>Delete</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-center p-4">
+              <Notebook className="h-16 w-16 text-muted-foreground/50" />
+              <h3 className="mt-4 text-lg font-semibold">Select a note or create a new one</h3>
+              <p className="text-sm text-muted-foreground">Your personal space for thoughts and ideas.</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -47,4 +47,16 @@ export type ActivityLogEvent = Omit<ActivityLogEventDTO, 'timestamp'> & {
   timestamp: number; // as milliseconds
 };
 
-    
+export type NoteDTO = {
+  userId: string;
+  title: string;
+  content: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+};
+
+export type Note = Omit<NoteDTO, 'createdAt' | 'updatedAt'> & {
+  id: string;
+  createdAt: number;
+  updatedAt: number;
+};

@@ -1,16 +1,20 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { SidebarProvider, Sidebar, SidebarInset } from '@/components/ui/sidebar';
 import UserDirectory from '@/components/UserDirectory';
 import PageHeader from './PageHeader';
 import { useUser } from '@/firebase';
-import { Puzzle } from 'lucide-react';
+import { Notebook, Puzzle, Users } from 'lucide-react';
+import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
+import Notepad from './Notepad';
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, isUserLoading } = useUser();
+  const [activeView, setActiveView] = useState('users');
+
 
   useEffect(() => {
     // This effect handles redirection based on auth state.
@@ -46,7 +50,27 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     <SidebarProvider>
       <div className="flex min-h-screen">
         <Sidebar side="left" collapsible="icon" className="border-r">
-          <UserDirectory />
+            {activeView === 'users' ? <UserDirectory /> : <Notepad />}
+            <SidebarMenu className="mt-auto p-2">
+                <SidebarMenuItem>
+                    <SidebarMenuButton
+                        onClick={() => setActiveView('users')}
+                        isActive={activeView === 'users'}
+                        tooltip="Members"
+                    >
+                        <Users />
+                    </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                    <SidebarMenuButton
+                        onClick={() => setActiveView('notes')}
+                        isActive={activeView === 'notes'}
+                        tooltip="Notepad"
+                    >
+                        <Notebook />
+                    </SidebarMenuButton>
+                </SidebarMenuItem>
+            </SidebarMenu>
         </Sidebar>
         <SidebarInset>
           <PageHeader />
