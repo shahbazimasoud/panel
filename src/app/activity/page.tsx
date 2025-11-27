@@ -124,13 +124,9 @@ export default function ActivityPage() {
         const typeMatch = typeFilter === 'ALL' || event.type === typeFilter;
         return dateMatch && typeMatch;
     });
-
-    const eventsForSummary = rawLog.filter(event => {
-        return !dateFilter || isSameDay(new Date(event.timestamp), startOfDay(dateFilter));
-    });
     
-    // --- Calculate summary for the top table ---
-    const overallSummary = calculateSummary(eventsForSummary, dateFilter);
+    // --- Calculate summary for the top table based on filtered events ---
+    const overallSummary = calculateSummary(filteredEvents, dateFilter);
     
     // --- Group filtered events by day for the detailed list ---
     const groupedByDay: Record<string, { events: ActivityLogEvent[] }> = {};
@@ -143,16 +139,21 @@ export default function ActivityPage() {
     }
     
     // --- Calculate daily totals for each visible card ---
-    // This should also use the filtered data to be consistent
+    // This should use the full day's data, regardless of the type filter, but respecting the date filter
     const dailyTotals: Record<string, { totalActiveSeconds: number }> = {};
+    const allEventsForSelectedDay = rawLog.filter(event => {
+        return !dateFilter || isSameDay(new Date(event.timestamp), startOfDay(dateFilter));
+    });
+
     const allEventsGroupedByDay: Record<string, { events: ActivityLogEvent[] }> = {};
-     for (const event of rawLog) {
+     for (const event of allEventsForSelectedDay) {
       const dateKey = format(new Date(event.timestamp), 'eeee, MMMM do, yyyy');
       if (!allEventsGroupedByDay[dateKey]) {
         allEventsGroupedByDay[dateKey] = { events: [] };
       }
       allEventsGroupedByDay[dateKey].events.push(event);
     }
+
     Object.keys(allEventsGroupedByDay).forEach(dateKey => {
         const dailyEvents = allEventsGroupedByDay[dateKey].events;
         // Pass the actual date of the key to calculateSummary for accurate ongoing session calculation
@@ -184,7 +185,7 @@ export default function ActivityPage() {
       setTypeFilter('ALL');
   }
 
-  const summaryTitle = dateFilter ? `خلاصه روز ${format(dateFilter, 'MMMM do, yyyy')}` : 'خلاصه کلی (تمام زمان‌ها)';
+  const summaryTitle = dateFilter ? `Summary for ${format(dateFilter, 'MMMM do, yyyy')}` : 'Overall Summary (All Time)';
 
   return (
     <MainLayout>
@@ -197,25 +198,25 @@ export default function ActivityPage() {
                       Back to Home
                     </Link>
                   </Button>
-                  <h1 className="text-3xl font-bold font-headline">گزارش فعالیت</h1>
-                  <p className="text-muted-foreground">گزارش دقیق فعالیت‌های شما در سیستم.</p>
+                  <h1 className="text-3xl font-bold font-headline">Activity Report</h1>
+                  <p className="text-muted-foreground">A detailed log of your activities in the system.</p>
                 </div>
             </div>
 
             <Card className="mb-8">
                 <CardHeader>
                     <CardTitle>{summaryTitle}</CardTitle>
-                    <CardDescription>مجموع زمان‌های فعال و غیرفعال بر اساس فیلتر انتخاب شده.</CardDescription>
+                    <CardDescription>Total active and away time based on the selected filter.</CardDescription>
                 </CardHeader>
                 <CardContent>
                      <Table>
                         <TableBody>
                             <TableRow>
-                                <TableCell className="font-medium">مجموع زمان فعال</TableCell>
+                                <TableCell className="font-medium">Total Active Time</TableCell>
                                 <TableCell className="text-right font-bold text-green-600">{formatTotalDuration(overallSummary.totalActiveSeconds)}</TableCell>
                             </TableRow>
                              <TableRow>
-                                <TableCell className="font-medium">مجموع زمان غیرفعال</TableCell>
+                                <TableCell className="font-medium">Total Away Time</TableCell>
                                 <TableCell className="text-right font-bold text-yellow-600">{formatTotalDuration(overallSummary.totalAwaySeconds)}</TableCell>
                             </TableRow>
                         </TableBody>
@@ -226,27 +227,27 @@ export default function ActivityPage() {
 
             <Card className="mb-8">
                 <CardHeader>
-                <CardTitle>فیلترها</CardTitle>
-                <CardDescription>گزارش فعالیت را بر اساس تاریخ یا نوع رویداد محدود کنید.</CardDescription>
+                <CardTitle>Filters</CardTitle>
+                <CardDescription>Narrow down the activity log by date or event type.</CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-4 sm:flex-row">
                     <DatePicker date={dateFilter} setDate={setDateFilter} />
                     <Select value={typeFilter} onValueChange={setTypeFilter}>
                         <SelectTrigger className="w-full sm:w-[180px]">
-                            <SelectValue placeholder="فیلتر بر اساس نوع" />
+                            <SelectValue placeholder="Filter by type" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="ALL">همه انواع</SelectItem>
-                            <SelectItem value="LOGIN">ورود</SelectItem>
-                            <SelectItem value="LOGOUT">خروج</SelectItem>
-                            <SelectItem value="AWAY">عدم فعالیت</SelectItem>
-                            <SelectItem value="ACTIVE">فعالیت مجدد</SelectItem>
+                            <SelectItem value="ALL">All Types</SelectItem>
+                            <SelectItem value="LOGIN">Login</SelectItem>
+                            <SelectItem value="LOGOUT">Logout</SelectItem>
+                            <SelectItem value="AWAY">Away</SelectItem>
+                            <SelectItem value="ACTIVE">Active</SelectItem>
                         </SelectContent>
                     </Select>
                     {(dateFilter || typeFilter !== 'ALL') && (
                         <Button variant="ghost" onClick={clearFilters}>
                             <FilterX className="mr-2 h-4 w-4" />
-                            حذف فیلترها
+                            Clear Filters
                         </Button>
                     )}
                 </CardContent>
@@ -257,13 +258,13 @@ export default function ActivityPage() {
                 {loading ? (
                     <Card>
                         <CardContent className="p-6 text-center">
-                        <p className="text-muted-foreground">در حال بارگذاری فعالیت‌ها...</p>
+                        <p className="text-muted-foreground">Loading activities...</p>
                         </CardContent>
                     </Card>
                 ) : processedLog.length === 0 ? (
                 <Card>
                     <CardContent className="p-6 text-center">
-                    <p className="text-muted-foreground">هیچ فعالیتی با فیلترهای فعلی مطابقت ندارد.</p>
+                    <p className="text-muted-foreground">No activities match the current filters.</p>
                     </CardContent>
                 </Card>
                 ) : (
@@ -274,7 +275,7 @@ export default function ActivityPage() {
                             <div className="flex justify-between items-center">
                                 <CardTitle className="text-xl">{dayLog.date}</CardTitle>
                                 <p className="text-sm font-medium text-muted-foreground">
-                                    زمان فعال روزانه: <span className="font-bold text-primary">{formatTotalDuration(dayLog.totalActiveSeconds)}</span>
+                                    Daily Active Time: <span className="font-bold text-primary">{formatTotalDuration(dayLog.totalActiveSeconds)}</span>
                                 </p>
                             </div>
                         </CardHeader>
