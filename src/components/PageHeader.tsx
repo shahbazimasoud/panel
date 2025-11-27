@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { SidebarTrigger } from '@/components/ui/sidebar';
-import { User, LogOut, PanelLeftOpen, Clock, Settings } from 'lucide-react';
+import { User, LogOut, PanelLeftOpen, Clock, Settings, Puzzle } from 'lucide-react';
 import Link from 'next/link';
 import {
   DropdownMenu,
@@ -89,8 +89,24 @@ export default function PageHeader() {
       await logActivity(firestore, authUser.uid, 'LOGOUT');
       await signOut(auth);
     }
-    router.push('/login');
+    // The redirect will be handled by the MainLayout's useEffect
   };
+  
+  if (loading) {
+    return (
+        <header className="sticky top-0 z-10 flex h-16 items-center border-b bg-background/80 px-4 backdrop-blur-sm sm:px-6">
+            <div className="w-full flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <PanelLeftOpen className="h-6 w-6 text-muted-foreground" />
+                </div>
+                <div className="flex items-center gap-2">
+                    <Puzzle className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+            </div>
+        </header>
+    );
+  }
+
 
   return (
     <header className="sticky top-0 z-10 flex h-16 items-center border-b bg-background/80 px-4 backdrop-blur-sm sm:px-6">
@@ -168,11 +184,11 @@ export default function PageHeader() {
               </DropdownMenu>
             </>
           ) : (
-            !loading && (
+              // This case should ideally not be hit if MainLayout handles redirection properly,
+              // but it's here as a fallback.
               <Button variant="ghost" onClick={() => router.push('/login')}>
                 Login
               </Button>
-            )
           )}
         </div>
       </div>
